@@ -30,20 +30,20 @@ except ImportError:
 # ── Paleta F1VE DR1VE ──────────────────────────────────────────
 
 # F1VE DR1VE • Midnight Drive UI (contrast ridicat, fara dependinte noi)
-BG = "#0A1424"            # fundal general navy
-WHITE = "#14263B"         # suprafata cardurilor, nu alb
-TEXT = "#F1F7FF"          # text principal
-MUTED = "#B1C6D8"         # text secundar
-PURPLE = "#1E4057"        # stare selectata
-PURPLE_DARK = "#55E1E6"   # accent turcoaz
-GREEN = "#163D35"         # card verde inchis
-GREEN_DARK = "#88F3C3"
-PEACH = "#493F21"         # card galben inchis
-BLUE = "#183A51"          # card albastru inchis
-BORDER = "#29465D"
-ACCENT_GREEN = "#24C787"
-SIDEBAR_BG = "#0C1C2E"
-HEADER_BG = "#10253A"
+BG = "#EAF7FC"           # light mode pastel
+WHITE = "#FFFFFF"
+TEXT = "#102F57"
+MUTED = "#527496"
+PURPLE = "#D5F0FC"       # blue plate
+PURPLE_DARK = "#176C9A"
+GREEN = "#DFF5E6"
+GREEN_DARK = "#258D4A"
+PEACH = "#FFFF99"
+BLUE = "#ADD8E6"
+BORDER = "#D0E4EF"
+ACCENT_GREEN = "#33AC58"
+SIDEBAR_BG = "#F5FCFF"
+HEADER_BG = "#E1F3FC"
 
 # Stil navigație nocturnă (pasul 1)
 NAV_BG = "#10283F"
@@ -51,6 +51,13 @@ NAV_PANEL = "#183A55"
 NAV_CYAN = "#31E4E8"
 NAV_TEXT = "#F1FAFF"
 NAV_TILES = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+# Palete accesibile, pastrand culorile originale ale brandului.
+LIGHT_THEME = dict(BG="#EAF7FC", WHITE="#FFFFFF", TEXT="#102F57", MUTED="#527496", PURPLE="#D5F0FC", PURPLE_DARK="#176C9A", GREEN="#DFF5E6", GREEN_DARK="#258D4A", PEACH="#FFFF99", BLUE="#ADD8E6", BORDER="#D0E4EF", ACCENT_GREEN="#33AC58", SIDEBAR_BG="#F5FCFF", HEADER_BG="#E1F3FC")
+DARK_THEME = dict(BG="#091727", WHITE="#14273C", TEXT="#F3FAFF", MUTED="#B5CCDF", PURPLE="#21435A", PURPLE_DARK="#6BE4ED", GREEN="#183C34", GREEN_DARK="#8DE3B0", PEACH="#514B24", BLUE="#24465C", BORDER="#36566B", ACCENT_GREEN="#33AC58", SIDEBAR_BG="#0D2032", HEADER_BG="#132B41")
+
+def apply_app_theme(mode):
+    globals().update(DARK_THEME if mode == "dark" else LIGHT_THEME)
 
 FONT = "Segoe UI"
 
@@ -173,7 +180,8 @@ def calculeaza_rute(start, destinatie):
     return date["routes"]
 
 
-def label(parent, text, size=11, color=TEXT, bold=False, bg=None):
+def label(parent, text, size=11, color=None, bold=False, bg=None):
+    if color is None: color = TEXT
     return tk.Label(
         parent,
         text=text,
@@ -185,7 +193,9 @@ def label(parent, text, size=11, color=TEXT, bold=False, bg=None):
     )
 
 
-def button(parent, text, command, bg=PURPLE, fg=PURPLE_DARK):
+def button(parent, text, command, bg=None, fg=None):
+    if bg is None: bg = PURPLE
+    if fg is None: fg = TEXT
     return tk.Button(
         parent,
         text=text,
@@ -207,7 +217,8 @@ def button(parent, text, command, bg=PURPLE, fg=PURPLE_DARK):
     )
 
 
-def card(parent, bg=WHITE):
+def card(parent, bg=None):
+    if bg is None: bg = WHITE
     return tk.Frame(
         parent,
         bg=bg,
@@ -222,6 +233,9 @@ class UniRide(tk.Tk):
     def __init__(self):
         super().__init__()
 
+        self.theme_mode = self.load_theme_preference()
+        apply_app_theme(self.theme_mode)
+        self.current_page = "Profil"
         self.title("F1VE DR1VE • Drumul spre facultate, mai simplu")
         self.geometry("1320x900")
         self.minsize(1000, 730)
@@ -355,7 +369,7 @@ class UniRide(tk.Tk):
         ).pack(anchor="w")
         label(
             footer, "O comunitate mai aproape.", 9, GREEN_DARK
-        ).pack(anchor="w", pady=(5, 0))
+        ).pack(anchor="w", pady=(2, 0))
 
     def build_header(self):
         header = tk.Frame(self.main, bg=HEADER_BG, padx=28, pady=18)
@@ -373,6 +387,7 @@ class UniRide(tk.Tk):
         badge.pack(side="right")
 
     def show_page(self, name):
+        self.current_page = name
         for item, widget in self.navigation.items():
             selected = item == name
             color = PURPLE if selected else SIDEBAR_BG
@@ -432,6 +447,23 @@ class UniRide(tk.Tk):
             db.execute("""CREATE TABLE IF NOT EXISTS recompense (
                 utilizator TEXT NOT NULL, obiect TEXT NOT NULL,
                 selectat_la TEXT NOT NULL, PRIMARY KEY(utilizator, obiect)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS profil_cosmetice (
+                utilizator TEXT NOT NULL,
+                categorie TEXT NOT NULL,
+                obiect TEXT NOT NULL,
+                PRIMARY KEY(utilizator, categorie)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS shop_cumparari (
+                utilizator TEXT NOT NULL,
+                obiect TEXT NOT NULL,
+                cost INTEGER NOT NULL,
+                cumparat_la TEXT NOT NULL,
+                PRIMARY KEY(utilizator, obiect)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS shop_demo (
+                utilizator TEXT PRIMARY KEY,
+                credite INTEGER NOT NULL DEFAULT 600
             )""")
             db.execute("""CREATE TABLE IF NOT EXISTS rapoarte_siguranta (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -665,58 +697,148 @@ class UniRide(tk.Tk):
                        (status,rid,self.account_user["email"].lower()))
         self.show_page("FlowFriends")
 
-    def pagina_puncte(self):
-        self.heading("FlowPoints", "Activitatea ta reală din baza de date locală.")
+    # Catalogul si starea profilului sunt persistate separat in SQLite.
+    SHOP_ITEMS = {
+        "Ramă avatar": [("Blue Plate", 0, "#ADD8E6"), ("Sun Glow", 150, "#FFFF99"),
+                         ("Fresh Green", 200, "#33AC58"), ("Wave", 200, "#75CDEB"),
+                         ("Leaf", 250, "#67BF83"), ("Minimal", 100, "#7AB5D5"),
+                         ("Dual Tone", 300, "#7BCDBA")],
+        "Fundal profil": [("Sky", 0, "#ADD8E6"), ("Sunny", 150, "#FFFF99"),
+                          ("Nature", 200, "#78CF8A"), ("City Vibes", 250, "#8ACCE8"),
+                          ("Blend", 300, "#8ED9C3")],
+        "Insignă": [("Șofer activ", 100, "#ADD8E6"), ("Prieten de încredere", 150, "#FFFF99"),
+                    ("Eco Driver", 200, "#8DD9A0"), ("Explorator", 200, "#9EDDF2"),
+                    ("Membru activ", 300, "#FFFF99")],
+        "Mascotă": [("Fără mascotă", 0, "#EAF7FC"), ("Cloudy", 150, "#ADD8E6"),
+                    ("Sunny", 150, "#FFFF99"), ("Leafy", 200, "#85D6A0")],
+    }
+
+    def shop_state(self):
+        key = self.user_key()
+        with deschide_baza() as db:
+            db.execute("INSERT OR IGNORE INTO shop_demo(utilizator,credite) VALUES(?,600)", (key,))
+            credits = db.execute("SELECT credite FROM shop_demo WHERE utilizator=?", (key,)).fetchone()[0]
+            owned = {r[0] for r in db.execute("SELECT obiect FROM shop_cumparari WHERE utilizator=?", (key,))}
+            chosen = dict(db.execute("SELECT categorie,obiect FROM profil_cosmetice WHERE utilizator=?", (key,)))
+        owned.update(("Blue Plate", "Sky", "Fără mascotă"))
+        return credits, owned, chosen
+
+    def shop_select(self, category, name, cost):
+        key = self.user_key()
+        with deschide_baza() as db:
+            db.execute("INSERT OR IGNORE INTO shop_demo(utilizator,credite) VALUES(?,600)", (key,))
+            already = db.execute("SELECT 1 FROM shop_cumparari WHERE utilizator=? AND obiect=?", (key, category + ":" + name)).fetchone()
+            free = cost == 0
+            if not already and not free:
+                balance = db.execute("SELECT credite FROM shop_demo WHERE utilizator=?", (key,)).fetchone()[0]
+                if balance < cost:
+                    messagebox.showwarning("FlowShop", "Nu ai suficiente puncte DEMO pentru această personalizare.", parent=self)
+                    return
+                if not messagebox.askyesno("FlowShop", f"Deblochezi «{name}» pentru {cost} puncte DEMO?", parent=self):
+                    return
+                db.execute("UPDATE shop_demo SET credite=credite-? WHERE utilizator=?", (cost,key))
+                db.execute("INSERT INTO shop_cumparari(utilizator,obiect,cost,cumparat_la) VALUES(?,?,?,?)",
+                           (key,category + ":" + name,cost,datetime.now().isoformat(timespec="seconds")))
+            db.execute("INSERT OR REPLACE INTO profil_cosmetice(utilizator,categorie,obiect) VALUES(?,?,?)", (key,category,name))
+        self.show_page("FlowShop")
+
+    def shop_reset_demo(self):
+        if not messagebox.askyesno("Resetare DEMO", "Resetezi punctele și obiectele cumpărate în modul demonstrativ?", parent=self):
+            return
         key=self.user_key()
         with deschide_baza() as db:
-            cursuri=db.execute("SELECT COUNT(*) FROM orar WHERE utilizator=?",(key,)).fetchone()[0]
-            if self.account_user:
-                rezervari=db.execute("SELECT COUNT(*) FROM rezervari WHERE pasager=? AND status='activa'",
-                                    (self.account_user["nume"],)).fetchone()[0]
-            else: rezervari=0
-            personalizari=db.execute("SELECT COUNT(*) FROM recompense WHERE utilizator=?",(key,)).fetchone()[0]
-        for title,value,desc in [
-            ("Cursuri în orar",cursuri,"Cursuri salvate în «Orarul meu»."),
-            ("Rezervări după nume",rezervari,"Pot include persoane cu același nume; asocierea sigură la cont urmează."),
-            ("Personalizări alese",personalizari,"Preferințe salvate în FlowShop."),
-        ]:
-            item=card(self.content);item.pack(fill="x",pady=6)
-            label(item,f"{title}: {value}",16,PURPLE_DARK,True).pack(anchor="w")
-            label(item,desc,10,MUTED).pack(anchor="w",pady=4)
-        label(self.content,"Sold FlowPoints: 0 • Nu acordăm puncte fictive. Recompensele vor necesita curse finalizate și validate.",11,MUTED).pack(anchor="w",pady=12)
+            db.execute("DELETE FROM shop_cumparari WHERE utilizator=?",(key,))
+            db.execute("DELETE FROM profil_cosmetice WHERE utilizator=?",(key,))
+            db.execute("INSERT OR REPLACE INTO shop_demo(utilizator,credite) VALUES(?,600)",(key,))
+        self.show_page("FlowShop")
+
+    def pagina_puncte(self):
+        self.heading("FlowPoints", "Punctele DEMO sunt separate de cursele validate.")
+        credits, owned, chosen = self.shop_state()
+        box = card(self.content, BLUE); box.pack(fill="x",pady=8)
+        label(box, f"★ {credits} puncte DEMO", 22, TEXT, True).pack(anchor="w")
+        label(box, "Credit demonstrativ pentru testarea FlowShop; nu este o recompensă reală.", 11, MUTED, bg=BLUE).pack(anchor="w",pady=5)
+        with deschide_baza() as db:
+            cursuri=db.execute("SELECT COUNT(*) FROM orar WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
+            cumparari=db.execute("SELECT COUNT(*) FROM shop_cumparari WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
+        label(self.content,f"Cursuri în orar: {cursuri}   •   Obiecte deblocate: {cumparari}   •   Puncte reale validate: 0",12,TEXT,True).pack(anchor="w",pady=12)
+        button(self.content,"Deschide FlowShop →",lambda:self.show_page("FlowShop"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=10)
+        button(self.content,"Resetează datele DEMO",self.shop_reset_demo,bg=PEACH,fg=TEXT).pack(anchor="w")
+
+    def shop_art(self, parent, name, color, kind, active=False):
+        c=tk.Canvas(parent,width=116,height=92,bg=WHITE,highlightthickness=0)
+        c.pack(pady=(4,1))
+        if kind=="Ramă avatar":
+            c.create_oval(25,4,91,70,fill="#EAF4F9",outline=color,width=7)
+            c.create_oval(49,23,67,41,fill="#D2E3ED",outline="")
+            c.create_arc(37,41,79,73,start=0,extent=180,fill="#D2E3ED",outline="")
+            if name in ("Leaf","Fresh Green","Dual Tone"):
+                c.create_oval(18,51,33,70,fill="#33AC58",outline="")
+                c.create_oval(84,5,98,26,fill="#33AC58",outline="")
+        elif kind=="Fundal profil":
+            c.create_rectangle(4,7,112,78,fill=color,outline="")
+            c.create_oval(65,15,99,49,fill="#FFF7B0",outline="")
+            if name in ("Nature","Blend"):
+                c.create_polygon(4,78,46,31,80,78,fill="#33AC58",outline="")
+                c.create_polygon(40,78,80,41,112,78,fill="#69C88C",outline="")
+            elif name=="City Vibes":
+                for x,h in ((16,35),(36,48),(58,29),(82,53)):
+                    c.create_rectangle(x,78-h,x+17,78,fill="#6EB5D5",outline="")
+            else:
+                c.create_oval(10,53,67,90,fill="#FFFFFF",outline="")
+        elif kind=="Insignă":
+            c.create_oval(27,9,89,71,fill=color,outline="#D3E5EF",width=2)
+            symbol={"Șofer activ":"🚗","Prieten de încredere":"♥","Eco Driver":"♣","Explorator":"⌖","Membru activ":"★"}.get(name,"★")
+            if symbol=="🚗": symbol="AUTO"
+            c.create_text(58,40,text=symbol,font=(FONT,16,"bold"),fill=TEXT)
+        else:
+            c.create_oval(28,14,87,72,fill=color,outline="#8FC9DA",width=2)
+            face={"Cloudy":"☁","Sunny":"☀","Leafy":"❀","Fără mascotă":"—"}.get(name,"☺")
+            c.create_text(58,40,text=face,font=(FONT,26,"bold"),fill=TEXT)
+        if active:
+            c.create_oval(90,66,107,83,fill="#33AC58",outline="white",width=2)
+            c.create_text(98,74,text="✓",fill="white",font=(FONT,10,"bold"))
 
     def pagina_shop(self):
-        self.heading("FlowShop", "Alege personalizări gratuite pentru profil. Nu se efectuează cumpărături.")
-        items=[("Lavender","Ramă mov pastel"),("Mint","Fundal verde pastel"),("Campus Buddy","Insignă de student")]
-        with deschide_baza() as db:
-            selected={r[0] for r in db.execute("SELECT obiect FROM recompense WHERE utilizator=?",(self.user_key(),))}
-        for code,desc in items:
-            item=card(self.content);item.pack(fill="x",pady=7)
-            label(item,desc,15,TEXT,True).pack(anchor="w")
-            label(item,"Selectată" if code in selected else "Disponibilă gratuit",10,MUTED).pack(anchor="w",pady=3)
-            button(item,"Elimină" if code in selected else "Activează",
-                   lambda x=code:self.schimba_personalizare(x)).pack(anchor="e")
-        label(self.content,"Nu există plăți sau reduceri reale în această versiune.",10,MUTED).pack(anchor="w",pady=8)
-
-    def schimba_personalizare(self, name):
-        with deschide_baza() as db:
-            exists=db.execute("SELECT 1 FROM recompense WHERE utilizator=? AND obiect=?",
-                              (self.user_key(),name)).fetchone()
-            if exists:
-                db.execute("DELETE FROM recompense WHERE utilizator=? AND obiect=?",(self.user_key(),name))
-            else:
-                db.execute("INSERT INTO recompense VALUES(?,?,?)",
-                           (self.user_key(),name,datetime.now().isoformat(timespec="seconds")))
-        self.show_page("FlowShop")
+        self.heading("Personalizare • FlowShop", "Rame, fundaluri, insigne și mascote, inspirate din designul tău.")
+        credits, owned, chosen = self.shop_state()
+        top=card(self.content,BLUE);top.pack(fill="x",pady=(0,9))
+        label(top,f"★ {credits} puncte DEMO disponibile",16,TEXT,True,bg=BLUE).pack(side="left")
+        button(top,"FlowPoints",lambda:self.show_page("FlowPoints"),bg=PEACH,fg=TEXT).pack(side="right")
+        label(self.content,"Mod DEMO: deblocările sunt salvate local, fără plăți și fără puncte câștigate fictiv.",10,MUTED).pack(anchor="w",pady=(0,7))
+        for category, items in self.SHOP_ITEMS.items():
+            section=card(self.content);section.pack(fill="x",pady=7)
+            label(section,category,17,TEXT,True).pack(anchor="w",pady=(0,8))
+            grid=tk.Frame(section,bg=WHITE);grid.pack(fill="x")
+            for i,(name,cost,color) in enumerate(items):
+                tile=tk.Frame(grid,bg=WHITE,highlightbackground=BORDER,highlightthickness=1,padx=4,pady=5)
+                tile.grid(row=i//4,column=i%4,padx=5,pady=5,sticky="nsew")
+                grid.columnconfigure(i%4,weight=1)
+                self.shop_art(tile,name,color,category,chosen.get(category)==name)
+                label(tile,name,10,TEXT,True).pack()
+                owned_item=cost==0 or (category + ":" + name) in owned
+                label(tile,"Gratuit" if cost==0 else f"{cost} puncte",9,MUTED).pack()
+                selected=chosen.get(category)==name
+                btn=button(tile,"✓ Activ" if selected else ("Aplică" if owned_item else "Deblochează"),
+                           lambda cat=category,n=name,c=cost:self.shop_select(cat,n,c),
+                           bg=GREEN if selected else (PURPLE if owned_item else PEACH),fg=TEXT)
+                btn.configure(font=(FONT,9,"bold"),padx=7,pady=5,state="disabled" if selected else "normal")
+                btn.pack(fill="x",pady=(4,0))
+        preview=card(self.content,BLUE);preview.pack(fill="x",pady=10)
+        label(preview,"PREVIZUALIZARE PROFIL",15,TEXT,True,bg=BLUE).pack(anchor="w")
+        name=self.account_user["nume"] if self.account_user else "Student F1VE DR1VE"
+        label(preview,f"{name}   •   {chosen.get('Ramă avatar','Blue Plate')}",15,TEXT,True,bg=BLUE).pack(anchor="w",pady=4)
+        label(preview,f"Fundal: {chosen.get('Fundal profil','Sky')}   |   Insignă: {chosen.get('Insignă','—')}   |   Mascotă: {chosen.get('Mascotă','—')}",11,MUTED,bg=BLUE).pack(anchor="w")
+        button(preview,"Vezi profilul →",lambda:self.show_page("Profil"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=8)
 
     def pagina_siguranta(self):
         self.heading("Siguranță", "Recomandări și raportare locală a incidentelor.")
-        info=card(self.content,"#4A2832");info.pack(fill="x",pady=8)
+        info=card(self.content,"#FFF0F1");info.pack(fill="x",pady=8)
         for line in ["• Confirmă identitatea și detaliile cursei înainte de plecare.",
                      "• Întâlnește-te într-un loc public și anunță o persoană de încredere.",
                      "• Nu folosi navigația laptopului ca sistem de siguranță la volan.",
                      "• Într-o urgență, sună la 112. Rapoartele de mai jos NU sunt monitorizate."]:
-            w=label(info,line,11,"#FF9FA8");w.pack(anchor="w",pady=3)
+            w=label(info,line,11,"#A32938");w.pack(anchor="w",pady=3)
         panel=card(self.content);panel.pack(fill="x",pady=8)
         category=tk.StringVar(value="Comportament nepotrivit")
         tk.OptionMenu(panel,category,"Comportament nepotrivit","Problemă cu o cursă","Problemă tehnică","Alt incident").pack(anchor="w")
@@ -737,13 +859,69 @@ class UniRide(tk.Tk):
             count=db.execute("SELECT COUNT(*) FROM rapoarte_siguranta WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
         label(self.content,f"Rapoarte salvate local: {count} (netrimise)",10,MUTED).pack(anchor="w",pady=8)
 
+    @staticmethod
+    def load_theme_preference():
+        try:
+            with deschide_baza() as db:
+                db.execute("CREATE TABLE IF NOT EXISTS preferinte_aplicatie (cheie TEXT PRIMARY KEY, valoare TEXT NOT NULL)")
+                row = db.execute("SELECT valoare FROM preferinte_aplicatie WHERE cheie='tema'").fetchone()
+            return row[0] if row and row[0] in ("light", "dark") else "light"
+        except Exception:
+            return "light"
+
+    def set_theme(self, mode):
+        if mode not in ("light", "dark") or mode == self.theme_mode:
+            return
+        try:
+            with deschide_baza() as db:
+                db.execute("CREATE TABLE IF NOT EXISTS preferinte_aplicatie (cheie TEXT PRIMARY KEY, valoare TEXT NOT NULL)")
+                db.execute("INSERT OR REPLACE INTO preferinte_aplicatie(cheie,valoare) VALUES('tema',?)", (mode,))
+        except Exception as exc:
+            messagebox.showerror("Temă", f"Nu s-a putut salva preferința: {exc}", parent=self)
+            return
+        self.theme_mode = mode
+        apply_app_theme(mode)
+        # Reconstruim numai widgeturile de interfață, nu datele / rutele / conturile.
+        for child in self.winfo_children():
+            child.destroy()
+        self.configure(bg=BG)
+        self.navigation = {}
+        self.build_sidebar()
+        self.main = tk.Frame(self, bg=BG)
+        self.main.pack(side="left", fill="both", expand=True)
+        self.build_header()
+        self.content = tk.Frame(self.main, bg=BG, padx=20, pady=10)
+        self.content.pack(fill="both", expand=True)
+        self.show_page(self.current_page)
+
+    def theme_settings(self):
+        panel = card(self.content)
+        panel.pack(fill="x", pady=(10, 16))
+        label(panel, "Aspectul aplicației", 15, TEXT, True).pack(anchor="w", pady=(0, 6))
+        label(panel, "Alege tema preferată. Se salvează și după repornire.", 10, MUTED).pack(anchor="w", pady=(0, 10))
+        controls = tk.Frame(panel, bg=panel.cget("bg"))
+        controls.pack(anchor="w", fill="x")
+        for mode, name in (("light", "☀  Light Mode"), ("dark", "☾  Dark Mode")):
+            active = self.theme_mode == mode
+            btn = button(controls, ("✓  " if active else "") + name,
+                         lambda selected=mode: self.set_theme(selected),
+                         bg=ACCENT_GREEN if active else PURPLE,
+                         fg="#FFFFFF" if active else TEXT)
+            btn.pack(side="left", padx=(0, 12))
+
     def pagina_cont(self):
         self.heading("Contul meu F1VE DR1VE", "Înregistrează-te sau conectează-te pentru a-ți salva profilul.")
+        self.theme_settings()
         if self.account_user:
             u = self.account_user
             label(self.content, f"Bine ai venit, {u['nume']}!", 20, GREEN_DARK, True).pack(anchor="w", pady=8)
             label(self.content, f"E-mail: {u['email']}", 12, TEXT).pack(anchor="w", pady=4)
             label(self.content, f"Facultate: {u.get('facultate') or '—'}", 12, TEXT).pack(anchor="w", pady=4)
+            _, _, chosen = self.shop_state()
+            label(self.content, "Personalizarea mea", 15, TEXT, True).pack(anchor="w", pady=(15,5))
+            for cat in self.SHOP_ITEMS:
+                label(self.content, f"{cat}: {chosen.get(cat, 'Implicit')}", 11, MUTED).pack(anchor="w",pady=2)
+            button(self.content,"Personalizează profilul →",lambda:self.show_page("FlowShop"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=8)
             button(self.content, "Deconectare", self.deconectare_cont).pack(anchor="w", pady=18)
             return
 
@@ -884,7 +1062,7 @@ class UniRide(tk.Tk):
         ).pack(anchor="w", pady=(4, 12))
 
         canvas = tk.Canvas(
-            map_card, bg="#1A3B35", highlightthickness=0, height=200
+            map_card, bg="#ADD8E6" if BG == LIGHT_THEME["BG"] else "#24465C", highlightthickness=0, height=200
         )
         canvas.pack(fill="both", expand=True)
         canvas.bind("<Configure>", lambda event: self.draw_map(canvas))
@@ -931,23 +1109,23 @@ class UniRide(tk.Tk):
         # Ilustrație decorativă, fără date geografice.
         canvas.create_oval(
             w * .04, h * .08, w * .38, h * .55,
-            fill="#193F36", outline=""
+            fill="#9DD0E5" if BG == LIGHT_THEME["BG"] else "#315D78", outline=""
         )
         canvas.create_oval(
             w * .65, h * .55, w * .98, h * .95,
-            fill="#193F36", outline=""
+            fill="#9DD0E5" if BG == LIGHT_THEME["BG"] else "#315D78", outline=""
         )
 
         for fraction in (.25, .55, .80):
             canvas.create_line(
                 w * fraction, 0, w * (fraction - .12), h,
-                fill=WHITE, width=17
+                fill="#F3FBFF" if BG == LIGHT_THEME["BG"] else "#D9ECF5", width=17
             )
 
         for fraction in (.30, .70):
             canvas.create_line(
                 0, h * fraction, w, h * (fraction + .08),
-                fill=WHITE, width=17
+                fill="#F3FBFF" if BG == LIGHT_THEME["BG"] else "#D9ECF5", width=17
             )
 
         route = [
@@ -958,7 +1136,7 @@ class UniRide(tk.Tk):
         ]
 
         canvas.create_line(
-            *route, fill="#927BB9", width=7,
+            *route, fill="#2389BD" if BG == LIGHT_THEME["BG"] else "#65DDE8", width=7,
             capstyle="round", joinstyle="round"
         )
 
@@ -976,68 +1154,72 @@ class UniRide(tk.Tk):
             )
 
     def pagina_rute(self):
-        self.heading(
-            "Rute & trafic",
-            "Hartă interactivă și navigație auto • fără cheie Google API.",
-        )
-        panel = tk.Frame(self.content, bg=WHITE, padx=10, pady=8)
+        # Antet compact: păstrăm spațiul pentru ambele butoane de selectare.
+        label(self.content, "Rute & trafic", 21, TEXT, True).pack(anchor="w")
+        label(self.content, "Compară două trasee și continuă în Google Maps.", 10, MUTED).pack(anchor="w", pady=(2, 8))
+        panel = tk.Frame(self.content, bg=WHITE, padx=9, pady=5)
         panel.pack(fill="both", expand=True)
 
-        label(panel, "Planifică drumul spre facultate", 17, TEXT, True).pack(anchor="w")
+        label(panel, "Planifică drumul spre facultate", 15, TEXT, True).pack(anchor="w")
         label(panel, "OSRM + trafic colaborativ (dacă există suficiente date reale)", 10, MUTED).pack(
-            anchor="w", pady=(4, 7)
+            anchor="w", pady=(1, 3)
         )
 
-        label(panel, "📍 De unde pleci?", 11, TEXT, True).pack(anchor="w", pady=(0, 5))
+        label(panel, "📍 De unde pleci?", 11, TEXT, True).pack(anchor="w", pady=(0, 2))
         origin_row = tk.Frame(panel, bg=WHITE)
-        origin_row.pack(fill="x", pady=(0, 10))
+        origin_row.pack(fill="x", pady=(0, 5))
         self.origin_entry = tk.Entry(
             origin_row, textvariable=self.origine, font=(FONT, 11),
             relief="solid", bd=1, highlightthickness=1,
             highlightbackground=BORDER, highlightcolor=ACCENT_GREEN,
         )
-        self.origin_entry.pack(side="left", fill="x", expand=True, ipady=8)
+        self.origin_entry.pack(side="left", fill="x", expand=True, ipady=5)
         button(origin_row, "📍 Locația mea (Windows)", self.cere_locatia, BLUE, TEXT).pack(
             side="left", padx=(8, 0)
         )
-        label(panel, "🎓 Unde mergi?", 11, TEXT, True).pack(anchor="w", pady=(0, 5))
+        label(panel, "🎓 Unde mergi?", 11, TEXT, True).pack(anchor="w", pady=(0, 2))
         destination_entry = tk.Entry(
             panel, textvariable=self.destinatie, font=(FONT, 11),
             relief="solid", bd=1, highlightthickness=1,
             highlightbackground=BORDER, highlightcolor=ACCENT_GREEN,
         )
-        destination_entry.pack(fill="x", ipady=8, pady=(0, 10))
+        destination_entry.pack(fill="x", ipady=5, pady=(0, 5))
 
         plecare_row = tk.Frame(panel, bg=WHITE)
-        plecare_row.pack(fill="x", pady=(0, 8))
+        plecare_row.pack(fill="x", pady=(0, 4))
         label(plecare_row, "🕒 Ora plecării (HH:MM):", 10, TEXT, True).pack(side="left", padx=(0, 12))
         tk.Entry(plecare_row, textvariable=self.ora_plecare, width=9,
-                 font=(FONT, 11)).pack(side="left", ipady=5)
+                 font=(FONT, 11)).pack(side="left", ipady=3)
         label(plecare_row, "Două estimări: normală și prudentă (+20% și 5 min)",
               9, MUTED).pack(side="left", padx=15)
 
-        label(panel, "Traficul este evaluat automat când există date reale. Fără date: traseu gri (necunoscut).", 9, MUTED).pack(anchor="w", pady=(0, 8))
+        label(panel, "Traficul este evaluat automat când există date reale. Fără date: traseu gri (necunoscut).", 9, MUTED).pack(anchor="w", pady=(0, 4))
         self.route_button = button(
             panel, "Se calculează..." if self.route_busy else "Calculează traseul  →",
             self.porneste_rute, ACCENT_GREEN, WHITE,
         )
-        self.route_button.pack(fill="x", pady=(2, 5))
+        self.route_button.configure(pady=7)
+        self.route_button.pack(fill="x", pady=(1, 2))
         if self.route_busy:
             self.route_button.configure(state="disabled")
         label_status = label(panel, "", 10, MUTED)
         label_status.configure(textvariable=self.route_status, wraplength=730)
-        label_status.pack(anchor="w", pady=(0, 5))
+        label_status.pack(anchor="w", pady=(0, 2))
 
         # Compararea rutelor și accesul Google Maps sunt deasupra hărții, mereu vizibile.
         selector = tk.Frame(panel, bg="#1B3448", highlightbackground=BORDER, highlightthickness=1)
-        selector.pack(fill="x", pady=(5, 7))
-        self.route_choices_frame = tk.Frame(selector, bg="#1B3448", padx=9, pady=5)
-        self.route_choices_frame.pack(fill="x")
-        self.maps_primary_button = button(selector, "↗ NAVIGHEAZĂ CU GOOGLE MAPS  •  ALEGE ÎNTÂI UN DRUM",
-                                          lambda: self.deschide_google_maps(self.selected_route_index),
-                                          "#29D5DB", "#092134")
-        self.maps_primary_button.pack(fill="x", padx=10, pady=(0, 8))
+        selector.pack(fill="x", pady=(2, 4))
+        # Butonul este INTENTIONAT deasupra cardurilor: nu mai dispare sub marginea ferestrei.
+        self.maps_primary_button = button(
+            selector, "↗ GOOGLE MAPS  •  CALCULEAZĂ ÎNTÂI TRASEUL",
+            lambda: self.deschide_google_maps(self.selected_route_index),
+            "#29D5DB", "#092134",
+        )
+        self.maps_primary_button.configure(pady=7)
+        self.maps_primary_button.pack(fill="x", padx=8, pady=(5, 2))
         self.maps_primary_button.configure(state="disabled")
+        self.route_choices_frame = tk.Frame(selector, bg="#1B3448", padx=7, pady=2)
+        self.route_choices_frame.pack(fill="x")
         self.arata_optiuni_trasee()
 
         rezultate = tk.Frame(panel, bg="#1B3448", highlightbackground=BORDER, highlightthickness=1)
@@ -1046,12 +1228,23 @@ class UniRide(tk.Tk):
         cap.configure(padx=14, pady=9)
         cap.pack(fill="x")
 
+        map_actions = tk.Frame(rezultate, bg="#1B3448")
+        map_actions.pack(fill="x", padx=7, pady=(3, 2))
+        harta_mare_btn = button(
+            map_actions, "⛶  DESCHIDE HARTA MARE  ↗",
+            self.deschide_harta_mare, "#29D5DB", "#092134"
+        )
+        harta_mare_btn.configure(font=(FONT, 13, "bold"), padx=30, pady=16)
+        harta_mare_btn.pack(side="left", padx=(0, 12), pady=(5, 7))
+        label(map_actions, "Mărește harta fără să pierzi rutele sau butonul Google Maps.",
+              9, MUTED).pack(side="left")
+
         if tkintermapview is not None:
             self.route_map = tkintermapview.TkinterMapView(
-                rezultate, width=1050, height=215, corner_radius=0
+                rezultate, width=1050, height=360, corner_radius=0
             )
-            self.route_map.pack(fill="x", expand=False, padx=2, pady=(2, 2))
-            self.route_map.configure(height=215)
+            self.route_map.pack(fill="both", expand=True, padx=2, pady=(2, 2))
+            self.route_map.configure(height=360)
             self.route_map.set_tile_server(
                 "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 max_zoom=19,
@@ -1765,7 +1958,7 @@ class UniRide(tk.Tk):
             copil.destroy()
         tk.Label(frame, text="ALEGE RUTA  •  compară înainte de navigare",
                  bg="#1B3448", fg=TEXT, font=(FONT, 11, "bold"),
-                 anchor="w").pack(fill="x", pady=(1, 5))
+                 anchor="w").pack(fill="x", pady=(0, 3))
         if not self.route_options:
             tk.Label(frame, text="Calculează traseul ca să vezi distanța, durata și traficul fiecărei variante.",
                      bg="#1B3448", fg=MUTED, font=(FONT, 9),
@@ -1776,7 +1969,7 @@ class UniRide(tk.Tk):
             for i, ruta in enumerate(self.route_options[:2]):
                 selected = i == self.selected_route_index
                 fundal = "#185264" if selected else "#122A40"
-                card = tk.Frame(rand, bg=fundal, padx=12, pady=8,
+                card = tk.Frame(rand, bg=fundal, padx=10, pady=4,
                                 highlightbackground="#38D8DC" if selected else "#34556B",
                                 highlightthickness=2 if selected else 1)
                 card.pack(side="left", fill="both", expand=True, padx=(0, 7) if i == 0 else (7, 0))
@@ -1789,10 +1982,12 @@ class UniRide(tk.Tk):
                     trafic = "Necunoscut"
                 tk.Label(card, text=f"{ruta['km']:.2f} km   •   {ruta['minute']} min   •   Trafic: {trafic}",
                          bg=fundal, fg=TEXT, font=(FONT, 10), anchor="w",
-                         wraplength=390).pack(fill="x", pady=(3, 6))
-                button(card, "✓ Selectată" if selected else "Alege această rută",
+                         wraplength=390).pack(fill="x", pady=(1, 3))
+                choose_button = button(card, "✓ Selectată" if selected else "Alege această rută",
                        lambda j=i: self.alege_traseu(j),
-                       "#27637B" if selected else ACCENT_GREEN, WHITE).pack(fill="x")
+                       "#27637B" if selected else ACCENT_GREEN, WHITE)
+                choose_button.configure(pady=6)
+                choose_button.pack(fill="x")
             if len(self.route_options) < 2:
                 tk.Label(frame, text="OSRM a găsit o singură rută distinctă.",
                          bg="#1B3448", fg=MUTED, font=(FONT, 9)).pack(anchor="w")
@@ -1805,7 +2000,10 @@ class UniRide(tk.Tk):
                 self.maps_primary_button.configure(state="disabled", text="↗ NAVIGHEAZĂ CU GOOGLE MAPS  •  CALCULEAZĂ TRASEUL")
 
     def deschide_google_maps(self, index=None):
-        """Google Maps Deep Link: doar destinația, nu geometria sau puncte via garantate."""
+        """Deschide Google Maps cu plecare, destinație și un reper via orientativ.
+
+        Google Maps recalculează ruta; un singur waypoint NU impune geometria OSRM.
+        """
         import webbrowser
         from urllib.parse import urlencode
         if index is not None:
@@ -1814,24 +2012,87 @@ class UniRide(tk.Tk):
         if not final:
             messagebox.showwarning("Google Maps", "Calculează întâi traseul.", parent=self)
             return
-        # Coordonatele OSRM sunt (lon, lat); Google Maps cere lat,lon.
-        lon, lat = final
+        lon, lat = final  # OSRM: (lon, lat)
         params = {"api": "1", "destination": f"{lat:.7f},{lon:.7f}", "travelmode": "driving"}
         start = getattr(self, "maps_origin_coords", None)
         if start:
             start_lon, start_lat = start
             params["origin"] = f"{start_lat:.7f},{start_lon:.7f}"
+
+        # Un punct intermediar orientativ, la mijlocul DISTANȚEI pe ruta selectată.
+        # Punctul poate influența traseul Google Maps, dar nu îl fixează exact.
+        reper = None
+        if 0 <= self.selected_route_index < len(self.route_options):
+            puncte = self.route_options[self.selected_route_index].get("puncte", [])
+            if len(puncte) >= 3:
+                import math
+                def metri(a, b):
+                    lat1, lon1 = a
+                    lat2, lon2 = b
+                    dy = (lat2 - lat1) * 111195.0
+                    dx = (lon2 - lon1) * 111195.0 * math.cos(math.radians((lat1 + lat2) / 2))
+                    return math.hypot(dx, dy)
+                total = sum(metri(puncte[k-1], puncte[k]) for k in range(1, len(puncte)))
+                parcurs = 0.0
+                for k in range(1, len(puncte)):
+                    parcurs += metri(puncte[k-1], puncte[k])
+                    if parcurs >= total / 2:
+                        reper = puncte[k]
+                        break
+                if reper and total >= 600:
+                    params["waypoints"] = f"{reper[0]:.7f},{reper[1]:.7f}"
         url = "https://www.google.com/maps/dir/?" + urlencode(params)
-        if messagebox.askokcancel("Deschide Google Maps",
-                "Se va deschide Google Maps cu plecarea și destinația.\n\n"
-                "Google Maps calculează propriul drum: ruta selectată în F1VE DR1VE "
-                "și eventualele puncte intermediare NU sunt transferate.\n\n"
-                "Continuăm?", parent=self):
-            webbrowser.open(url)
+        mesaj = ("Se deschide Google Maps cu plecarea și destinația" +
+                 (" și un punct intermediar orientativ de pe ruta aleasă" if "waypoints" in params else "") +
+                 ".\n\nGoogle Maps poate recalcula un alt drum; nu se poate transfera "
+                 "garantat traseul exact din F1VE DR1VE.\n\nContinuăm?")
+        if messagebox.askokcancel("Deschide Google Maps", mesaj, parent=self):
+            if not webbrowser.open(url):
+                messagebox.showinfo("Google Maps", "Deschide acest link în browser:\n" + url, parent=self)
 
     @staticmethod
     def culoare_trafic(stare):
         return {"Liber": "#28A745", "Moderat": "#E5B700", "Aglomerat": "#D32F2F"}.get(stare, "#748697")
+
+    def deschide_harta_mare(self):
+        """Fereastră de hartă mare; folosește rutele existente, fără recalculare."""
+        if tkintermapview is None:
+            messagebox.showwarning("Hartă", "Instalează tkintermapview pentru afișarea hărții.", parent=self)
+            return
+        fereastra = tk.Toplevel(self)
+        fereastra.title("F1VE DR1VE • Hartă mare")
+        fereastra.geometry("1250x800")
+        fereastra.configure(bg="#0B1D30")
+        bara = tk.Frame(fereastra, bg="#122A40", padx=12, pady=9)
+        bara.pack(fill="x")
+        tk.Label(bara, text="F1VE DR1VE  •  HARTĂ INTERACTIVĂ",
+                 bg="#122A40", fg="#64E9EB", font=(FONT, 14, "bold")).pack(side="left")
+        button(bara, "Navighează cu Google Maps ↗",
+               lambda: self.deschide_google_maps(self.selected_route_index),
+               "#29D5DB", "#092134").pack(side="right", padx=6)
+        if not self.route_options:
+            tk.Label(bara, text="Calculează mai întâi un traseu în pagina principală.",
+                     bg="#122A40", fg=TEXT).pack(side="right", padx=12)
+        harta = tkintermapview.TkinterMapView(fereastra, width=1200, height=700, corner_radius=0)
+        harta.pack(fill="both", expand=True, padx=9, pady=9)
+        harta.set_tile_server("https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", max_zoom=19)
+        if self.route_options:
+            toate = []
+            for i, ruta in reversed(list(enumerate(self.route_options[:2]))):
+                puncte = ruta.get("puncte", [])
+                if len(puncte) > 1:
+                    toate.extend(puncte)
+                    harta.set_path(self.puncte_pentru_harta(puncte),
+                                   color=self.culoare_trafic(ruta.get("trafic")),
+                                   width=8 if i == self.selected_route_index else 5)
+            if toate:
+                harta.set_marker(toate[0][0], toate[0][1], text="Plecare")
+                harta.set_marker(toate[-1][0], toate[-1][1], text="Destinație")
+                harta.fit_bounding_box((max(a for a,b in toate), min(b for a,b in toate)),
+                                       (min(a for a,b in toate), max(b for a,b in toate)))
+        else:
+            harta.set_position(47.1585, 27.6014)
+            harta.set_zoom(12)
 
     def alege_traseu(self, index):
         if index >= len(self.route_options):
@@ -1846,7 +2107,7 @@ class UniRide(tk.Tk):
             harta.fit_bounding_box((max(x for x,y in puncte), min(y for x,y in puncte)),
                                    (min(x for x,y in puncte), max(y for x,y in puncte)))
         self.arata_optiuni_trasee()
-        self.route_status.set("Ruta selectată. Apasă «Deschide destinația în Google Maps» pentru navigație; Google Maps poate alege alt drum.")
+        self.route_status.set("Ruta selectată. Butonul Google Maps este deasupra rutelor; Maps poate recalcula drumul.")
 
     @staticmethod
     def puncte_pentru_harta(puncte, limita=650):
@@ -2010,7 +2271,7 @@ class UniRide(tk.Tk):
         w = label(aviso, "Înainte de a contacta pe cineva, vei primi o avertizare și ți se va cere acordul. "
                   "Nu publica adresa exactă sau coordonatele dispozitivului.", 10, "#FF9FA8")
         w.configure(wraplength=850)
-        w.pack(anchor="w", pady=(5, 0))
+        w.pack(anchor="w", pady=(2, 0))
 
         form = card(outer)
         form.pack(fill="x", pady=(0, 9))

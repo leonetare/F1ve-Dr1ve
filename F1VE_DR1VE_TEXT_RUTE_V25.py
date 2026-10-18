@@ -27,23 +27,27 @@ try:
 except ImportError:
     tkintermapview = None
 
+# F1VE DR1VE: Fără cheie API nu putem extrage datele de trafic Google Maps.
+# Google Maps URLs permit însă deschiderea rutelor direct în Maps, unde utilizatorul
+# poate activa stratul de trafic. Nu prezentăm trafic OSRM ca trafic Google LIVE.
+
 # ── Paleta F1VE DR1VE ──────────────────────────────────────────
 
 # F1VE DR1VE • Midnight Drive UI (contrast ridicat, fara dependinte noi)
-BG = "#0A1424"            # fundal general navy
-WHITE = "#14263B"         # suprafata cardurilor, nu alb
-TEXT = "#F1F7FF"          # text principal
-MUTED = "#B1C6D8"         # text secundar
-PURPLE = "#1E4057"        # stare selectata
-PURPLE_DARK = "#55E1E6"   # accent turcoaz
-GREEN = "#163D35"         # card verde inchis
-GREEN_DARK = "#88F3C3"
-PEACH = "#493F21"         # card galben inchis
-BLUE = "#183A51"          # card albastru inchis
-BORDER = "#29465D"
-ACCENT_GREEN = "#24C787"
-SIDEBAR_BG = "#0C1C2E"
-HEADER_BG = "#10253A"
+BG = "#EAF7FC"           # light mode pastel
+WHITE = "#FFFFFF"
+TEXT = "#102F57"
+MUTED = "#527496"
+PURPLE = "#D5F0FC"       # blue plate
+PURPLE_DARK = "#176C9A"
+GREEN = "#DFF5E6"
+GREEN_DARK = "#258D4A"
+PEACH = "#FFFF99"
+BLUE = "#ADD8E6"
+BORDER = "#D0E4EF"
+ACCENT_GREEN = "#33AC58"
+SIDEBAR_BG = "#F5FCFF"
+HEADER_BG = "#E1F3FC"
 
 # Stil navigație nocturnă (pasul 1)
 NAV_BG = "#10283F"
@@ -51,6 +55,13 @@ NAV_PANEL = "#183A55"
 NAV_CYAN = "#31E4E8"
 NAV_TEXT = "#F1FAFF"
 NAV_TILES = "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png"
+
+# Palete accesibile, pastrand culorile originale ale brandului.
+LIGHT_THEME = dict(BG="#EAF7FC", WHITE="#FFFFFF", TEXT="#102F57", MUTED="#527496", PURPLE="#D5F0FC", PURPLE_DARK="#176C9A", GREEN="#DFF5E6", GREEN_DARK="#258D4A", PEACH="#FFFF99", BLUE="#ADD8E6", BORDER="#D0E4EF", ACCENT_GREEN="#33AC58", SIDEBAR_BG="#F5FCFF", HEADER_BG="#E1F3FC")
+DARK_THEME = dict(BG="#091727", WHITE="#14273C", TEXT="#F3FAFF", MUTED="#B5CCDF", PURPLE="#21435A", PURPLE_DARK="#6BE4ED", GREEN="#183C34", GREEN_DARK="#8DE3B0", PEACH="#514B24", BLUE="#24465C", BORDER="#36566B", ACCENT_GREEN="#33AC58", SIDEBAR_BG="#0D2032", HEADER_BG="#132B41")
+
+def apply_app_theme(mode):
+    globals().update(DARK_THEME if mode == "dark" else LIGHT_THEME)
 
 FONT = "Segoe UI"
 
@@ -173,7 +184,8 @@ def calculeaza_rute(start, destinatie):
     return date["routes"]
 
 
-def label(parent, text, size=11, color=TEXT, bold=False, bg=None):
+def label(parent, text, size=11, color=None, bold=False, bg=None):
+    if color is None: color = TEXT
     return tk.Label(
         parent,
         text=text,
@@ -185,7 +197,9 @@ def label(parent, text, size=11, color=TEXT, bold=False, bg=None):
     )
 
 
-def button(parent, text, command, bg=PURPLE, fg=PURPLE_DARK):
+def button(parent, text, command, bg=None, fg=None):
+    if bg is None: bg = PURPLE
+    if fg is None: fg = TEXT
     return tk.Button(
         parent,
         text=text,
@@ -207,7 +221,8 @@ def button(parent, text, command, bg=PURPLE, fg=PURPLE_DARK):
     )
 
 
-def card(parent, bg=WHITE):
+def card(parent, bg=None):
+    if bg is None: bg = WHITE
     return tk.Frame(
         parent,
         bg=bg,
@@ -222,6 +237,9 @@ class UniRide(tk.Tk):
     def __init__(self):
         super().__init__()
 
+        self.theme_mode = self.load_theme_preference()
+        apply_app_theme(self.theme_mode)
+        self.current_page = "Profil"
         self.title("F1VE DR1VE • Drumul spre facultate, mai simplu")
         self.geometry("1320x900")
         self.minsize(1000, 730)
@@ -284,7 +302,7 @@ class UniRide(tk.Tk):
         self.init_module_locale()
         self.init_notificari_locale()
         self.notificari_afisate = set()
-        self.after(3000, self.verifica_notificari_plecare)
+        self.after(1500, self.verifica_notificari_plecare)
         self.navigation = {}
         self.build_sidebar()
 
@@ -295,6 +313,7 @@ class UniRide(tk.Tk):
 
         self.content = tk.Frame(self.main, bg=BG, padx=20, pady=10)
         self.content.pack(fill="both", expand=True)
+        self.content_root = self.content
 
         self.protocol("WM_DELETE_WINDOW", self.inchide_aplicatia)
         self.show_page("Profil")
@@ -355,7 +374,7 @@ class UniRide(tk.Tk):
         ).pack(anchor="w")
         label(
             footer, "O comunitate mai aproape.", 9, GREEN_DARK
-        ).pack(anchor="w", pady=(5, 0))
+        ).pack(anchor="w", pady=(2, 0))
 
     def build_header(self):
         header = tk.Frame(self.main, bg=HEADER_BG, padx=28, pady=18)
@@ -373,6 +392,11 @@ class UniRide(tk.Tk):
         badge.pack(side="right")
 
     def show_page(self, name):
+        self.content = self.content_root
+        self.unbind_all("<MouseWheel>")
+        self.unbind_all("<Button-4>")
+        self.unbind_all("<Button-5>")
+        self.current_page = name
         for item, widget in self.navigation.items():
             selected = item == name
             color = PURPLE if selected else SIDEBAR_BG
@@ -399,6 +423,7 @@ class UniRide(tk.Tk):
         elif name == "Profil":
             self.pagina_cont()
         elif name == "Orarul meu":
+            self.pregateste_scroll_orar()
             self.pagina_orar()
         elif name == "FlowFriends":
             self.pagina_prieteni()
@@ -432,6 +457,23 @@ class UniRide(tk.Tk):
             db.execute("""CREATE TABLE IF NOT EXISTS recompense (
                 utilizator TEXT NOT NULL, obiect TEXT NOT NULL,
                 selectat_la TEXT NOT NULL, PRIMARY KEY(utilizator, obiect)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS profil_cosmetice (
+                utilizator TEXT NOT NULL,
+                categorie TEXT NOT NULL,
+                obiect TEXT NOT NULL,
+                PRIMARY KEY(utilizator, categorie)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS shop_cumparari (
+                utilizator TEXT NOT NULL,
+                obiect TEXT NOT NULL,
+                cost INTEGER NOT NULL,
+                cumparat_la TEXT NOT NULL,
+                PRIMARY KEY(utilizator, obiect)
+            )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS shop_demo (
+                utilizator TEXT PRIMARY KEY,
+                credite INTEGER NOT NULL DEFAULT 600
             )""")
             db.execute("""CREATE TABLE IF NOT EXISTS rapoarte_siguranta (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -476,6 +518,16 @@ class UniRide(tk.Tk):
                 marja_min INTEGER NOT NULL DEFAULT 10,
                 avertizare_min INTEGER NOT NULL DEFAULT 15
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS notificari_trimise (
+                utilizator TEXT NOT NULL,
+                curs_id INTEGER NOT NULL,
+                data_curs TEXT NOT NULL,
+                etapa TEXT NOT NULL,
+                trimisa_la TEXT NOT NULL,
+                PRIMARY KEY (utilizator, curs_id, data_curs, etapa)
+            )""")
+            db.execute("DELETE FROM notificari_trimise WHERE trimisa_la < ?",
+                       ((datetime.now()-timedelta(days=30)).isoformat(timespec="seconds"),))
 
     def setari_notificari(self):
         with deschide_baza() as db:
@@ -492,7 +544,8 @@ class UniRide(tk.Tk):
         line = tk.Frame(panel,bg=WHITE)
         line.pack(anchor="w",pady=6)
         enabled=tk.BooleanVar(value=bool(activ))
-        tk.Checkbutton(line,text="Activează notificările",variable=enabled,bg=WHITE,font=(FONT,10)).pack(side="left",padx=(0,12))
+        tk.Checkbutton(line,text="Activează notificările",variable=enabled,bg=WHITE,fg=TEXT,
+                       selectcolor=WHITE,activebackground=WHITE,font=(FONT,10)).pack(side="left",padx=(0,12))
         def small_field(title,value):
             label(line,title,10,TEXT).pack(side="left",padx=(5,3))
             entry=tk.Entry(line,width=5,font=(FONT,10))
@@ -514,14 +567,31 @@ class UniRide(tk.Tk):
                                   marja_min=excluded.marja_min,avertizare_min=excluded.avertizare_min""",
                                (self.user_key(),int(enabled.get()),d,m,w))
                 self.show_page("Orarul meu")
+                self.after(100, self.verifica_notificari_plecare)
             except ValueError as exc:
                 messagebox.showwarning("Notificări",str(exc),parent=self)
-        button(panel,"Salvează notificările",save).pack(anchor="w",pady=5)
+        controls=tk.Frame(panel,bg=WHITE)
+        controls.pack(fill="x",pady=5)
+        button(controls,"Salvează notificările",save).pack(side="left",padx=(0,10))
+        # Ceasul se actualizează automat după ora locală a calculatorului.
+        clock=tk.StringVar(value="")
+        label(panel,"Ora locală a calculatorului:",10,MUTED).pack(anchor="w",pady=(5,0))
+        tk.Label(panel,textvariable=clock,font=(FONT,12,"bold"),bg=WHITE,fg=TEXT).pack(anchor="w")
+        def update_clock():
+            try:
+                if not panel.winfo_exists(): return
+                clock.set(datetime.now().strftime("%d.%m.%Y • %H:%M:%S"))
+                panel.after(1000,update_clock)
+            except tk.TclError:
+                return
+        update_clock()
         upcoming=self.urmatoarele_plecari(1)
         if upcoming:
             when,subject,departure,room,_ = upcoming[0]
             label(panel,f"Următoarea plecare: {departure:%a %d.%m, %H:%M} pentru {subject} (curs la {when:%H:%M})",10,GREEN_DARK).pack(anchor="w",pady=3)
-        label(panel,"Estimare manuală, nu trafic live. Notificările apar doar cât aplicația este deschisă.",10,MUTED).pack(anchor="w")
+        else:
+            label(panel,"Adaugă un curs viitor în orar pentru a primi o notificare.",10,MUTED).pack(anchor="w",pady=3)
+        label(panel,"Alerte vizibile pe ecran cât aplicația rulează. Estimare manuală, nu trafic live.",10,MUTED).pack(anchor="w")
 
     def urmatoarele_plecari(self, limit=20):
         _,duration,margin,_=self.setari_notificari()
@@ -542,81 +612,217 @@ class UniRide(tk.Tk):
                     upcoming.append((lesson,subject,leave,room,cid))
         return sorted(upcoming,key=lambda item:item[2])[:limit]
 
+    def afiseaza_alerta_plecare(self, titlu, mesaj):
+        """Fereastră neblocantă; nu oprește verificarea notificărilor."""
+        try:
+            pop=tk.Toplevel(self)
+            pop.title("F1VE DR1VE • Notificare")
+            pop.configure(bg=BG)
+            pop.geometry("460x205")
+            pop.resizable(False,False)
+            pop.attributes("-topmost",True)
+            self.update_idletasks()
+            x=max(0,self.winfo_rootx()+self.winfo_width()-490)
+            y=max(0,self.winfo_rooty()+self.winfo_height()-245)
+            pop.geometry(f"+{x}+{y}")
+            tk.Label(pop,text="🔔  "+titlu,font=(FONT,14,"bold"),bg=BG,fg=TEXT,
+                     anchor="w").pack(fill="x",padx=16,pady=(14,7))
+            tk.Label(pop,text=mesaj,font=(FONT,10),bg=BG,fg=TEXT,
+                     justify="left",wraplength=425,anchor="w").pack(fill="both",expand=True,padx=16)
+            tk.Button(pop,text="Am înțeles",command=pop.destroy,bg=ACCENT_GREEN,fg="#FFFFFF",
+                      font=(FONT,10,"bold"),relief="flat",padx=15,pady=7).pack(pady=(2,12))
+            try: self.bell()
+            except tk.TclError: pass
+            pop.after(60000,lambda: pop.winfo_exists() and pop.destroy())
+        except tk.TclError as exc:
+            print("[F1VE DR1VE] Afișare alertă:",exc)
+
     def verifica_notificari_plecare(self):
         try:
             active,_,_,warning=self.setari_notificari()
             if active:
                 now=datetime.now()
                 for lesson,subject,leave,room,cid in self.urmatoarele_plecari():
-                    token=(self.user_key(),cid,lesson.date().isoformat())
-                    if token in self.notificari_afisate: continue
-                    warning_at=leave-timedelta(minutes=warning)
-                    # Nu afișa notificări vechi la deschiderea aplicației.
-                    if warning_at<=now<=leave+timedelta(minutes=1):
-                        self.notificari_afisate.add(token)
-                        self.bell()
-                        left=max(0,round((leave-now).total_seconds()/60))
-                        messagebox.showinfo("F1VE DR1VE • Ora plecării",
-                            f"Pentru {subject} (ora {lesson:%H:%M}), plecarea recomandată este la {leave:%H:%M}.\n"
-                            f"Mai ai aproximativ {left} minute până la plecare.\n"
-                            f"Destinație / sală: {room or 'nespecificată'}\n\n"
-                            "Estimare bazată pe durata introdusă, nu pe trafic în timp real.",parent=self)
+                    for etapa,trigger in (("avertizare",leave-timedelta(minutes=warning)),
+                                          ("plecare",leave)):
+                        # Verifică ora locală reală, inclusiv dacă Windows a fost
+                        # suspendat pentru câteva minute. Nu trimite alerte vechi.
+                        if not (trigger <= now < trigger + timedelta(minutes=5)):
+                            continue
+                        with deschide_baza() as db:
+                            cur=db.execute("""INSERT OR IGNORE INTO notificari_trimise
+                                (utilizator,curs_id,data_curs,etapa,trimisa_la) VALUES(?,?,?,?,?)""",
+                                (self.user_key(),cid,lesson.date().isoformat(),etapa,
+                                 now.isoformat(timespec="seconds")))
+                            nou=cur.rowcount>0
+                        if not nou: continue
+                        if etapa=="avertizare":
+                            title="Pregătește-te de plecare"
+                            msg=(f"{subject} începe la {lesson:%H:%M}.\n"
+                                 f"Plecare recomandată: {leave:%H:%M} (în aproximativ "
+                                 f"{max(0,round((leave-now).total_seconds()/60))} min).\n"
+                                 f"Sala: {room or 'nespecificată'}")
+                        else:
+                            title="Este timpul să pleci!"
+                            msg=(f"Pentru {subject}, ora recomandată este {leave:%H:%M}.\n"
+                                 f"Cursul începe la {lesson:%H:%M}.\n"
+                                 f"Sala: {room or 'nespecificată'}\n"
+                                 "Durata este estimată, fără trafic live.")
+                        self.afiseaza_alerta_plecare(title,msg)
         except (sqlite3.Error,tk.TclError,ValueError) as exc:
             print("[F1VE DR1VE] Notificări:",exc)
         finally:
-            try: self.after(30000,self.verifica_notificari_plecare)
+            try: self.after(5000,self.verifica_notificari_plecare)
             except tk.TclError: pass
 
+    def pregateste_scroll_orar(self):
+        """Canvas scrollabil doar pentru orar; celelalte pagini rămân intacte."""
+        outer = tk.Frame(self.content_root, bg=BG)
+        outer.pack(fill="both", expand=True)
+        canvas = tk.Canvas(outer, bg=BG, highlightthickness=0, borderwidth=0)
+        bar = tk.Scrollbar(outer, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=bar.set)
+        bar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        inner = tk.Frame(canvas, bg=BG, padx=4, pady=4)
+        window_id = canvas.create_window((0, 0), window=inner, anchor="nw")
+        inner.bind("<Configure>", lambda event: canvas.configure(scrollregion=canvas.bbox("all")))
+        canvas.bind("<Configure>", lambda event: canvas.itemconfigure(window_id, width=event.width))
+
+        def wheel(event):
+            if not canvas.winfo_exists() or self.current_page != "Orarul meu":
+                return
+            if event.num == 4:
+                delta = -1
+            elif event.num == 5:
+                delta = 1
+            else:
+                delta = -int(event.delta / 120) if event.delta else 0
+            if delta:
+                canvas.yview_scroll(delta, "units")
+
+        # Activ doar când cursorul este în pagina de orar.
+        def attach(event):
+            canvas.bind_all("<MouseWheel>", wheel)
+            canvas.bind_all("<Button-4>", wheel)
+            canvas.bind_all("<Button-5>", wheel)
+        def detach(event):
+            canvas.unbind_all("<MouseWheel>")
+            canvas.unbind_all("<Button-4>")
+            canvas.unbind_all("<Button-5>")
+        outer.bind("<Enter>", attach)
+        outer.bind("<Leave>", detach)
+        self.content = inner
+
     def pagina_orar(self):
-        self.heading("Orarul meu", "Adaugă cursuri și primește notificări despre ora recomandată de plecare.")
+        self.heading("Orarul meu", "Adaugă, modifică sau șterge cursuri. Derulează pentru a vedea întregul orar.")
         self.panou_notificari_plecare()
+        days = ["Luni", "Marți", "Miercuri", "Joi", "Vineri", "Sâmbătă", "Duminică"]
         form = card(self.content)
-        form.pack(fill="x", pady=(0, 10))
+        form.pack(fill="x", pady=(0, 12))
+        label(form, "ADAUGĂ / MODIFICĂ O ACTIVITATE", 12, TEXT, True).pack(anchor="w", pady=(0, 8))
         line = tk.Frame(form, bg=WHITE)
-        line.pack(anchor="w")
-        label(line, "Ziua", 10, MUTED).pack(side="left", padx=(0,8))
-        days = ["Luni","Marți","Miercuri","Joi","Vineri","Sâmbătă","Duminică"]
+        line.pack(anchor="w", fill="x")
+        label(line, "Ziua", 10, MUTED).pack(side="left", padx=(0, 8))
         zi = tk.StringVar(value="Luni")
-        tk.OptionMenu(line, zi, *days).pack(side="left", padx=(0,15))
+        tk.OptionMenu(line, zi, *days).pack(side="left", padx=(0, 12))
         label(line, "Început", 10, MUTED).pack(side="left")
         inceput = tk.Entry(line, width=7)
-        inceput.insert(0,"09:00")
+        inceput.insert(0, "09:00")
         inceput.pack(side="left", padx=6)
         label(line, "Sfârșit", 10, MUTED).pack(side="left")
         sfarsit = tk.Entry(line, width=7)
-        sfarsit.insert(0,"11:00")
+        sfarsit.insert(0, "11:00")
         sfarsit.pack(side="left", padx=6)
         fields = tk.Frame(form, bg=WHITE)
-        fields.pack(anchor="w", pady=6)
+        fields.pack(anchor="w", fill="x", pady=6)
         materie = self.camp(fields, "Materie", 45)
         tip = self.camp(fields, "Tip (curs / seminar / laborator)", 30, "Curs")
         sala = self.camp(fields, "Sala / clădire", 35)
+        editing_id = [None]
+        info = label(form, "Completează datele sau apasă «Modifică» lângă un curs.", 10, MUTED)
+        info.pack(anchor="w", pady=(3, 6))
+
+        def set_entry(widget, value):
+            widget.delete(0, "end")
+            widget.insert(0, str(value))
+
+        def reset():
+            editing_id[0] = None
+            zi.set("Luni")
+            set_entry(inceput, "09:00")
+            set_entry(sfarsit, "11:00")
+            set_entry(materie, "")
+            set_entry(tip, "Curs")
+            set_entry(sala, "")
+            save_btn.configure(text="Salvează curs nou")
+            info.configure(text="Modul adăugare curs nou")
+
         def save():
             try:
-                a=datetime.strptime(inceput.get().strip(), "%H:%M")
-                b=datetime.strptime(sfarsit.get().strip(), "%H:%M")
-                if b<=a: raise ValueError("Ora de sfârșit trebuie să fie după început.")
-                if not materie.get().strip(): raise ValueError("Completează materia.")
+                a = datetime.strptime(inceput.get().strip(), "%H:%M")
+                b = datetime.strptime(sfarsit.get().strip(), "%H:%M")
+                if b <= a:
+                    raise ValueError("Ora de sfârșit trebuie să fie după început.")
+                if not materie.get().strip():
+                    raise ValueError("Completează materia.")
+                values = (days.index(zi.get()), a.strftime("%H:%M"), b.strftime("%H:%M"),
+                          materie.get().strip()[:100], tip.get().strip()[:40], sala.get().strip()[:80])
                 with deschide_baza() as db:
-                    db.execute("INSERT INTO orar(utilizator,zi,inceput,sfarsit,materie,tip,sala) VALUES(?,?,?,?,?,?,?)",
-                               (self.user_key(),days.index(zi.get()),a.strftime("%H:%M"),b.strftime("%H:%M"),
-                                materie.get().strip()[:100],tip.get().strip()[:40],sala.get().strip()[:80]))
+                    if editing_id[0] is None:
+                        db.execute("INSERT INTO orar(utilizator,zi,inceput,sfarsit,materie,tip,sala) VALUES(?,?,?,?,?,?,?)",
+                                   (self.user_key(), *values))
+                    else:
+                        cursor = db.execute("UPDATE orar SET zi=?,inceput=?,sfarsit=?,materie=?,tip=?,sala=? WHERE id=? AND utilizator=?",
+                                            (*values, editing_id[0], self.user_key()))
+                        if cursor.rowcount != 1:
+                            raise ValueError("Cursul nu mai există sau nu îți aparține.")
                 self.pagina_reload("Orarul meu")
-            except ValueError as exc: messagebox.showwarning("Orar",str(exc),parent=self)
-        button(form,"Salvează cursul",save).pack(anchor="w",pady=6)
-        listing = tk.Frame(self.content,bg=BG)
-        listing.pack(fill="both",expand=True)
+            except ValueError as exc:
+                messagebox.showwarning("Orar", str(exc), parent=self)
+            except sqlite3.Error as exc:
+                messagebox.showerror("Orar", f"Nu am putut salva cursul: {exc}", parent=self)
+
+        controls = tk.Frame(form, bg=WHITE)
+        controls.pack(anchor="w", fill="x", pady=6)
+        save_btn = button(controls, "Salvează curs nou", save)
+        save_btn.pack(side="left", padx=(0, 10))
+        button(controls, "Renunță la modificare", reset, bg="#ADD8E6", fg="#123452").pack(side="left")
+
+        listing = tk.Frame(self.content, bg=BG)
+        listing.pack(fill="x", pady=(4, 20))
+        label(listing, "CURSURILE TALE SALVATE", 12, TEXT, True).pack(anchor="w", pady=(0, 8))
         with deschide_baza() as db:
-            rows=db.execute("SELECT id,zi,inceput,sfarsit,materie,tip,sala FROM orar WHERE utilizator=? ORDER BY zi,inceput",
-                            (self.user_key(),)).fetchall()
-        if not rows: label(listing,"Nu ai cursuri adăugate încă.",12,MUTED).pack(anchor="w")
-        for row in rows[:12]:
-            cid, day, start, stop, subj, kind, room=row
-            item=tk.Frame(listing,bg=WHITE,padx=10,pady=5)
-            item.pack(fill="x",pady=2)
-            label(item,f"{days[day]}  {start}–{stop}   {subj}  • {kind} • {room}",10,TEXT).pack(side="left",fill="x",expand=True)
-            button(item,"Șterge",lambda x=cid:self.sterge_orar(x),bg="#4A2832",fg="#FF9FA8").pack(side="right")
-        if len(rows)>12: label(listing,f"Încă {len(rows)-12} cursuri salvate.",10,MUTED).pack(anchor="w")
+            rows = db.execute("SELECT id,zi,inceput,sfarsit,materie,tip,sala FROM orar WHERE utilizator=? ORDER BY zi,inceput",
+                              (self.user_key(),)).fetchall()
+        if not rows:
+            label(listing, "Nu ai cursuri adăugate încă.", 11, MUTED).pack(anchor="w")
+
+        def edit(row):
+            cid, day, start, stop, subj, kind, room = row
+            editing_id[0] = cid
+            zi.set(days[day])
+            for widget, value in ((inceput, start), (sfarsit, stop), (materie, subj),
+                                  (tip, kind), (sala, room)):
+                set_entry(widget, value)
+            save_btn.configure(text="Salvează modificările")
+            info.configure(text=f"Modifici: {subj} ({days[day]}, {start})")
+            # Mutăm vizual formularul în partea de sus a paginii.
+            self.content.master.yview_moveto(0)
+            materie.focus_set()
+
+        def delete(cid):
+            if messagebox.askyesno("Ștergere curs", "Sigur vrei să ștergi acest curs din orar?", parent=self):
+                self.sterge_orar(cid)
+
+        for row in rows:
+            cid, day, start, stop, subj, kind, room = row
+            item = tk.Frame(listing, bg=WHITE, padx=12, pady=8)
+            item.pack(fill="x", pady=3)
+            label(item, f"{days[day]}  {start}–{stop}   {subj}  • {kind} • {room}", 10, TEXT).pack(
+                side="left", fill="x", expand=True, anchor="w")
+            button(item, "Șterge", lambda x=cid: delete(x), bg="#B8424A", fg="#FFFFFF").pack(side="right", padx=(6, 0))
+            button(item, "Modifică", lambda r=row: edit(r), bg="#ADD8E6", fg="#123452").pack(side="right")
 
     def pagina_reload(self, name):
         self.show_page(name)
@@ -665,58 +871,148 @@ class UniRide(tk.Tk):
                        (status,rid,self.account_user["email"].lower()))
         self.show_page("FlowFriends")
 
-    def pagina_puncte(self):
-        self.heading("FlowPoints", "Activitatea ta reală din baza de date locală.")
+    # Catalogul si starea profilului sunt persistate separat in SQLite.
+    SHOP_ITEMS = {
+        "Ramă avatar": [("Blue Plate", 0, "#ADD8E6"), ("Sun Glow", 150, "#FFFF99"),
+                         ("Fresh Green", 200, "#33AC58"), ("Wave", 200, "#75CDEB"),
+                         ("Leaf", 250, "#67BF83"), ("Minimal", 100, "#7AB5D5"),
+                         ("Dual Tone", 300, "#7BCDBA")],
+        "Fundal profil": [("Sky", 0, "#ADD8E6"), ("Sunny", 150, "#FFFF99"),
+                          ("Nature", 200, "#78CF8A"), ("City Vibes", 250, "#8ACCE8"),
+                          ("Blend", 300, "#8ED9C3")],
+        "Insignă": [("Șofer activ", 100, "#ADD8E6"), ("Prieten de încredere", 150, "#FFFF99"),
+                    ("Eco Driver", 200, "#8DD9A0"), ("Explorator", 200, "#9EDDF2"),
+                    ("Membru activ", 300, "#FFFF99")],
+        "Mascotă": [("Fără mascotă", 0, "#EAF7FC"), ("Cloudy", 150, "#ADD8E6"),
+                    ("Sunny", 150, "#FFFF99"), ("Leafy", 200, "#85D6A0")],
+    }
+
+    def shop_state(self):
+        key = self.user_key()
+        with deschide_baza() as db:
+            db.execute("INSERT OR IGNORE INTO shop_demo(utilizator,credite) VALUES(?,600)", (key,))
+            credits = db.execute("SELECT credite FROM shop_demo WHERE utilizator=?", (key,)).fetchone()[0]
+            owned = {r[0] for r in db.execute("SELECT obiect FROM shop_cumparari WHERE utilizator=?", (key,))}
+            chosen = dict(db.execute("SELECT categorie,obiect FROM profil_cosmetice WHERE utilizator=?", (key,)))
+        owned.update(("Blue Plate", "Sky", "Fără mascotă"))
+        return credits, owned, chosen
+
+    def shop_select(self, category, name, cost):
+        key = self.user_key()
+        with deschide_baza() as db:
+            db.execute("INSERT OR IGNORE INTO shop_demo(utilizator,credite) VALUES(?,600)", (key,))
+            already = db.execute("SELECT 1 FROM shop_cumparari WHERE utilizator=? AND obiect=?", (key, category + ":" + name)).fetchone()
+            free = cost == 0
+            if not already and not free:
+                balance = db.execute("SELECT credite FROM shop_demo WHERE utilizator=?", (key,)).fetchone()[0]
+                if balance < cost:
+                    messagebox.showwarning("FlowShop", "Nu ai suficiente puncte DEMO pentru această personalizare.", parent=self)
+                    return
+                if not messagebox.askyesno("FlowShop", f"Deblochezi «{name}» pentru {cost} puncte DEMO?", parent=self):
+                    return
+                db.execute("UPDATE shop_demo SET credite=credite-? WHERE utilizator=?", (cost,key))
+                db.execute("INSERT INTO shop_cumparari(utilizator,obiect,cost,cumparat_la) VALUES(?,?,?,?)",
+                           (key,category + ":" + name,cost,datetime.now().isoformat(timespec="seconds")))
+            db.execute("INSERT OR REPLACE INTO profil_cosmetice(utilizator,categorie,obiect) VALUES(?,?,?)", (key,category,name))
+        self.show_page("FlowShop")
+
+    def shop_reset_demo(self):
+        if not messagebox.askyesno("Resetare DEMO", "Resetezi punctele și obiectele cumpărate în modul demonstrativ?", parent=self):
+            return
         key=self.user_key()
         with deschide_baza() as db:
-            cursuri=db.execute("SELECT COUNT(*) FROM orar WHERE utilizator=?",(key,)).fetchone()[0]
-            if self.account_user:
-                rezervari=db.execute("SELECT COUNT(*) FROM rezervari WHERE pasager=? AND status='activa'",
-                                    (self.account_user["nume"],)).fetchone()[0]
-            else: rezervari=0
-            personalizari=db.execute("SELECT COUNT(*) FROM recompense WHERE utilizator=?",(key,)).fetchone()[0]
-        for title,value,desc in [
-            ("Cursuri în orar",cursuri,"Cursuri salvate în «Orarul meu»."),
-            ("Rezervări după nume",rezervari,"Pot include persoane cu același nume; asocierea sigură la cont urmează."),
-            ("Personalizări alese",personalizari,"Preferințe salvate în FlowShop."),
-        ]:
-            item=card(self.content);item.pack(fill="x",pady=6)
-            label(item,f"{title}: {value}",16,PURPLE_DARK,True).pack(anchor="w")
-            label(item,desc,10,MUTED).pack(anchor="w",pady=4)
-        label(self.content,"Sold FlowPoints: 0 • Nu acordăm puncte fictive. Recompensele vor necesita curse finalizate și validate.",11,MUTED).pack(anchor="w",pady=12)
+            db.execute("DELETE FROM shop_cumparari WHERE utilizator=?",(key,))
+            db.execute("DELETE FROM profil_cosmetice WHERE utilizator=?",(key,))
+            db.execute("INSERT OR REPLACE INTO shop_demo(utilizator,credite) VALUES(?,600)",(key,))
+        self.show_page("FlowShop")
+
+    def pagina_puncte(self):
+        self.heading("FlowPoints", "Punctele DEMO sunt separate de cursele validate.")
+        credits, owned, chosen = self.shop_state()
+        box = card(self.content, BLUE); box.pack(fill="x",pady=8)
+        label(box, f"★ {credits} puncte DEMO", 22, TEXT, True).pack(anchor="w")
+        label(box, "Credit demonstrativ pentru testarea FlowShop; nu este o recompensă reală.", 11, MUTED, bg=BLUE).pack(anchor="w",pady=5)
+        with deschide_baza() as db:
+            cursuri=db.execute("SELECT COUNT(*) FROM orar WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
+            cumparari=db.execute("SELECT COUNT(*) FROM shop_cumparari WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
+        label(self.content,f"Cursuri în orar: {cursuri}   •   Obiecte deblocate: {cumparari}   •   Puncte reale validate: 0",12,TEXT,True).pack(anchor="w",pady=12)
+        button(self.content,"Deschide FlowShop →",lambda:self.show_page("FlowShop"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=10)
+        button(self.content,"Resetează datele DEMO",self.shop_reset_demo,bg=PEACH,fg=TEXT).pack(anchor="w")
+
+    def shop_art(self, parent, name, color, kind, active=False):
+        c=tk.Canvas(parent,width=116,height=92,bg=WHITE,highlightthickness=0)
+        c.pack(pady=(4,1))
+        if kind=="Ramă avatar":
+            c.create_oval(25,4,91,70,fill="#EAF4F9",outline=color,width=7)
+            c.create_oval(49,23,67,41,fill="#D2E3ED",outline="")
+            c.create_arc(37,41,79,73,start=0,extent=180,fill="#D2E3ED",outline="")
+            if name in ("Leaf","Fresh Green","Dual Tone"):
+                c.create_oval(18,51,33,70,fill="#33AC58",outline="")
+                c.create_oval(84,5,98,26,fill="#33AC58",outline="")
+        elif kind=="Fundal profil":
+            c.create_rectangle(4,7,112,78,fill=color,outline="")
+            c.create_oval(65,15,99,49,fill="#FFF7B0",outline="")
+            if name in ("Nature","Blend"):
+                c.create_polygon(4,78,46,31,80,78,fill="#33AC58",outline="")
+                c.create_polygon(40,78,80,41,112,78,fill="#69C88C",outline="")
+            elif name=="City Vibes":
+                for x,h in ((16,35),(36,48),(58,29),(82,53)):
+                    c.create_rectangle(x,78-h,x+17,78,fill="#6EB5D5",outline="")
+            else:
+                c.create_oval(10,53,67,90,fill="#FFFFFF",outline="")
+        elif kind=="Insignă":
+            c.create_oval(27,9,89,71,fill=color,outline="#D3E5EF",width=2)
+            symbol={"Șofer activ":"🚗","Prieten de încredere":"♥","Eco Driver":"♣","Explorator":"⌖","Membru activ":"★"}.get(name,"★")
+            if symbol=="🚗": symbol="AUTO"
+            c.create_text(58,40,text=symbol,font=(FONT,16,"bold"),fill=TEXT)
+        else:
+            c.create_oval(28,14,87,72,fill=color,outline="#8FC9DA",width=2)
+            face={"Cloudy":"☁","Sunny":"☀","Leafy":"❀","Fără mascotă":"—"}.get(name,"☺")
+            c.create_text(58,40,text=face,font=(FONT,26,"bold"),fill=TEXT)
+        if active:
+            c.create_oval(90,66,107,83,fill="#33AC58",outline="white",width=2)
+            c.create_text(98,74,text="✓",fill="white",font=(FONT,10,"bold"))
 
     def pagina_shop(self):
-        self.heading("FlowShop", "Alege personalizări gratuite pentru profil. Nu se efectuează cumpărături.")
-        items=[("Lavender","Ramă mov pastel"),("Mint","Fundal verde pastel"),("Campus Buddy","Insignă de student")]
-        with deschide_baza() as db:
-            selected={r[0] for r in db.execute("SELECT obiect FROM recompense WHERE utilizator=?",(self.user_key(),))}
-        for code,desc in items:
-            item=card(self.content);item.pack(fill="x",pady=7)
-            label(item,desc,15,TEXT,True).pack(anchor="w")
-            label(item,"Selectată" if code in selected else "Disponibilă gratuit",10,MUTED).pack(anchor="w",pady=3)
-            button(item,"Elimină" if code in selected else "Activează",
-                   lambda x=code:self.schimba_personalizare(x)).pack(anchor="e")
-        label(self.content,"Nu există plăți sau reduceri reale în această versiune.",10,MUTED).pack(anchor="w",pady=8)
-
-    def schimba_personalizare(self, name):
-        with deschide_baza() as db:
-            exists=db.execute("SELECT 1 FROM recompense WHERE utilizator=? AND obiect=?",
-                              (self.user_key(),name)).fetchone()
-            if exists:
-                db.execute("DELETE FROM recompense WHERE utilizator=? AND obiect=?",(self.user_key(),name))
-            else:
-                db.execute("INSERT INTO recompense VALUES(?,?,?)",
-                           (self.user_key(),name,datetime.now().isoformat(timespec="seconds")))
-        self.show_page("FlowShop")
+        self.heading("Personalizare • FlowShop", "Rame, fundaluri, insigne și mascote, inspirate din designul tău.")
+        credits, owned, chosen = self.shop_state()
+        top=card(self.content,BLUE);top.pack(fill="x",pady=(0,9))
+        label(top,f"★ {credits} puncte DEMO disponibile",16,TEXT,True,bg=BLUE).pack(side="left")
+        button(top,"FlowPoints",lambda:self.show_page("FlowPoints"),bg=PEACH,fg=TEXT).pack(side="right")
+        label(self.content,"Mod DEMO: deblocările sunt salvate local, fără plăți și fără puncte câștigate fictiv.",10,MUTED).pack(anchor="w",pady=(0,7))
+        for category, items in self.SHOP_ITEMS.items():
+            section=card(self.content);section.pack(fill="x",pady=7)
+            label(section,category,17,TEXT,True).pack(anchor="w",pady=(0,8))
+            grid=tk.Frame(section,bg=WHITE);grid.pack(fill="x")
+            for i,(name,cost,color) in enumerate(items):
+                tile=tk.Frame(grid,bg=WHITE,highlightbackground=BORDER,highlightthickness=1,padx=4,pady=5)
+                tile.grid(row=i//4,column=i%4,padx=5,pady=5,sticky="nsew")
+                grid.columnconfigure(i%4,weight=1)
+                self.shop_art(tile,name,color,category,chosen.get(category)==name)
+                label(tile,name,10,TEXT,True).pack()
+                owned_item=cost==0 or (category + ":" + name) in owned
+                label(tile,"Gratuit" if cost==0 else f"{cost} puncte",9,MUTED).pack()
+                selected=chosen.get(category)==name
+                btn=button(tile,"✓ Activ" if selected else ("Aplică" if owned_item else "Deblochează"),
+                           lambda cat=category,n=name,c=cost:self.shop_select(cat,n,c),
+                           bg=GREEN if selected else (PURPLE if owned_item else PEACH),fg=TEXT)
+                btn.configure(font=(FONT,9,"bold"),padx=7,pady=5,state="disabled" if selected else "normal")
+                btn.pack(fill="x",pady=(4,0))
+        preview=card(self.content,BLUE);preview.pack(fill="x",pady=10)
+        label(preview,"PREVIZUALIZARE PROFIL",15,TEXT,True,bg=BLUE).pack(anchor="w")
+        name=self.account_user["nume"] if self.account_user else "Student F1VE DR1VE"
+        label(preview,f"{name}   •   {chosen.get('Ramă avatar','Blue Plate')}",15,TEXT,True,bg=BLUE).pack(anchor="w",pady=4)
+        label(preview,f"Fundal: {chosen.get('Fundal profil','Sky')}   |   Insignă: {chosen.get('Insignă','—')}   |   Mascotă: {chosen.get('Mascotă','—')}",11,MUTED,bg=BLUE).pack(anchor="w")
+        button(preview,"Vezi profilul →",lambda:self.show_page("Profil"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=8)
 
     def pagina_siguranta(self):
         self.heading("Siguranță", "Recomandări și raportare locală a incidentelor.")
-        info=card(self.content,"#4A2832");info.pack(fill="x",pady=8)
+        info=card(self.content,"#FFF0F1");info.pack(fill="x",pady=8)
         for line in ["• Confirmă identitatea și detaliile cursei înainte de plecare.",
                      "• Întâlnește-te într-un loc public și anunță o persoană de încredere.",
                      "• Nu folosi navigația laptopului ca sistem de siguranță la volan.",
                      "• Într-o urgență, sună la 112. Rapoartele de mai jos NU sunt monitorizate."]:
-            w=label(info,line,11,"#FF9FA8");w.pack(anchor="w",pady=3)
+            w=label(info,line,11,"#A32938");w.pack(anchor="w",pady=3)
         panel=card(self.content);panel.pack(fill="x",pady=8)
         category=tk.StringVar(value="Comportament nepotrivit")
         tk.OptionMenu(panel,category,"Comportament nepotrivit","Problemă cu o cursă","Problemă tehnică","Alt incident").pack(anchor="w")
@@ -737,13 +1033,72 @@ class UniRide(tk.Tk):
             count=db.execute("SELECT COUNT(*) FROM rapoarte_siguranta WHERE utilizator=?",(self.user_key(),)).fetchone()[0]
         label(self.content,f"Rapoarte salvate local: {count} (netrimise)",10,MUTED).pack(anchor="w",pady=8)
 
+    @staticmethod
+    def load_theme_preference():
+        try:
+            with deschide_baza() as db:
+                db.execute("CREATE TABLE IF NOT EXISTS preferinte_aplicatie (cheie TEXT PRIMARY KEY, valoare TEXT NOT NULL)")
+                row = db.execute("SELECT valoare FROM preferinte_aplicatie WHERE cheie='tema'").fetchone()
+            return row[0] if row and row[0] in ("light", "dark") else "light"
+        except Exception:
+            return "light"
+
+    def set_theme(self, mode):
+        if mode not in ("light", "dark") or mode == self.theme_mode:
+            return
+        try:
+            with deschide_baza() as db:
+                db.execute("CREATE TABLE IF NOT EXISTS preferinte_aplicatie (cheie TEXT PRIMARY KEY, valoare TEXT NOT NULL)")
+                db.execute("INSERT OR REPLACE INTO preferinte_aplicatie(cheie,valoare) VALUES('tema',?)", (mode,))
+        except Exception as exc:
+            messagebox.showerror("Temă", f"Nu s-a putut salva preferința: {exc}", parent=self)
+            return
+        self.theme_mode = mode
+        apply_app_theme(mode)
+        # Reconstruim numai widgeturile de interfață, nu datele / rutele / conturile.
+        for child in self.winfo_children():
+            child.destroy()
+        self.configure(bg=BG)
+        self.navigation = {}
+        self.build_sidebar()
+        self.main = tk.Frame(self, bg=BG)
+        self.main.pack(side="left", fill="both", expand=True)
+        self.build_header()
+        self.content = tk.Frame(self.main, bg=BG, padx=20, pady=10)
+        self.content.pack(fill="both", expand=True)
+        # IMPORTANT: show_page() desenează în content_root; la schimbarea temei
+        # vechiul frame este distrus, deci referința trebuie actualizată.
+        self.content_root = self.content
+        self.show_page(self.current_page)
+
+    def theme_settings(self):
+        panel = card(self.content)
+        panel.pack(fill="x", pady=(10, 16))
+        label(panel, "Aspectul aplicației", 15, TEXT, True).pack(anchor="w", pady=(0, 6))
+        label(panel, "Alege tema preferată. Se salvează și după repornire.", 10, MUTED).pack(anchor="w", pady=(0, 10))
+        controls = tk.Frame(panel, bg=panel.cget("bg"))
+        controls.pack(anchor="w", fill="x")
+        for mode, name in (("light", "☀  Light Mode"), ("dark", "☾  Dark Mode")):
+            active = self.theme_mode == mode
+            btn = button(controls, ("✓  " if active else "") + name,
+                         lambda selected=mode: self.set_theme(selected),
+                         bg=ACCENT_GREEN if active else PURPLE,
+                         fg="#FFFFFF" if active else TEXT)
+            btn.pack(side="left", padx=(0, 12))
+
     def pagina_cont(self):
         self.heading("Contul meu F1VE DR1VE", "Înregistrează-te sau conectează-te pentru a-ți salva profilul.")
+        self.theme_settings()
         if self.account_user:
             u = self.account_user
             label(self.content, f"Bine ai venit, {u['nume']}!", 20, GREEN_DARK, True).pack(anchor="w", pady=8)
             label(self.content, f"E-mail: {u['email']}", 12, TEXT).pack(anchor="w", pady=4)
             label(self.content, f"Facultate: {u.get('facultate') or '—'}", 12, TEXT).pack(anchor="w", pady=4)
+            _, _, chosen = self.shop_state()
+            label(self.content, "Personalizarea mea", 15, TEXT, True).pack(anchor="w", pady=(15,5))
+            for cat in self.SHOP_ITEMS:
+                label(self.content, f"{cat}: {chosen.get(cat, 'Implicit')}", 11, MUTED).pack(anchor="w",pady=2)
+            button(self.content,"Personalizează profilul →",lambda:self.show_page("FlowShop"),bg=ACCENT_GREEN,fg="white").pack(anchor="w",pady=8)
             button(self.content, "Deconectare", self.deconectare_cont).pack(anchor="w", pady=18)
             return
 
@@ -884,7 +1239,7 @@ class UniRide(tk.Tk):
         ).pack(anchor="w", pady=(4, 12))
 
         canvas = tk.Canvas(
-            map_card, bg="#1A3B35", highlightthickness=0, height=200
+            map_card, bg="#ADD8E6" if BG == LIGHT_THEME["BG"] else "#24465C", highlightthickness=0, height=200
         )
         canvas.pack(fill="both", expand=True)
         canvas.bind("<Configure>", lambda event: self.draw_map(canvas))
@@ -931,23 +1286,23 @@ class UniRide(tk.Tk):
         # Ilustrație decorativă, fără date geografice.
         canvas.create_oval(
             w * .04, h * .08, w * .38, h * .55,
-            fill="#193F36", outline=""
+            fill="#9DD0E5" if BG == LIGHT_THEME["BG"] else "#315D78", outline=""
         )
         canvas.create_oval(
             w * .65, h * .55, w * .98, h * .95,
-            fill="#193F36", outline=""
+            fill="#9DD0E5" if BG == LIGHT_THEME["BG"] else "#315D78", outline=""
         )
 
         for fraction in (.25, .55, .80):
             canvas.create_line(
                 w * fraction, 0, w * (fraction - .12), h,
-                fill=WHITE, width=17
+                fill="#F3FBFF" if BG == LIGHT_THEME["BG"] else "#D9ECF5", width=17
             )
 
         for fraction in (.30, .70):
             canvas.create_line(
                 0, h * fraction, w, h * (fraction + .08),
-                fill=WHITE, width=17
+                fill="#F3FBFF" if BG == LIGHT_THEME["BG"] else "#D9ECF5", width=17
             )
 
         route = [
@@ -958,7 +1313,7 @@ class UniRide(tk.Tk):
         ]
 
         canvas.create_line(
-            *route, fill="#927BB9", width=7,
+            *route, fill="#2389BD" if BG == LIGHT_THEME["BG"] else "#65DDE8", width=7,
             capstyle="round", joinstyle="round"
         )
 
@@ -976,71 +1331,110 @@ class UniRide(tk.Tk):
             )
 
     def pagina_rute(self):
-        self.heading(
-            "Rute & trafic",
-            "Hartă interactivă și navigație auto • fără cheie Google API.",
-        )
-        panel = tk.Frame(self.content, bg=WHITE, padx=10, pady=8)
+        # Antet compact: păstrăm spațiul pentru ambele butoane de selectare.
+        label(self.content, "Rute & trafic", 21, TEXT, True).pack(anchor="w")
+        label(self.content, "Compară două trasee și continuă în Google Maps.", 10, MUTED).pack(anchor="w", pady=(2, 8))
+        panel = tk.Frame(self.content, bg=WHITE, padx=9, pady=5)
         panel.pack(fill="both", expand=True)
 
-        label(panel, "Planifică drumul spre facultate", 17, TEXT, True).pack(anchor="w")
+        label(panel, "Planifică drumul spre facultate", 15, TEXT, True).pack(anchor="w")
         label(panel, "OSRM + trafic colaborativ (dacă există suficiente date reale)", 10, MUTED).pack(
-            anchor="w", pady=(4, 7)
+            anchor="w", pady=(1, 3)
         )
 
-        label(panel, "📍 De unde pleci?", 11, TEXT, True).pack(anchor="w", pady=(0, 5))
+        label(panel, "📍 De unde pleci?", 11, TEXT, True).pack(anchor="w", pady=(0, 2))
         origin_row = tk.Frame(panel, bg=WHITE)
-        origin_row.pack(fill="x", pady=(0, 10))
+        origin_row.pack(fill="x", pady=(0, 5))
         self.origin_entry = tk.Entry(
             origin_row, textvariable=self.origine, font=(FONT, 11),
             relief="solid", bd=1, highlightthickness=1,
             highlightbackground=BORDER, highlightcolor=ACCENT_GREEN,
         )
-        self.origin_entry.pack(side="left", fill="x", expand=True, ipady=8)
+        self.origin_entry.pack(side="left", fill="x", expand=True, ipady=5)
         button(origin_row, "📍 Locația mea (Windows)", self.cere_locatia, BLUE, TEXT).pack(
             side="left", padx=(8, 0)
         )
-        label(panel, "🎓 Unde mergi?", 11, TEXT, True).pack(anchor="w", pady=(0, 5))
+        label(panel, "🎓 Unde mergi?", 11, TEXT, True).pack(anchor="w", pady=(0, 2))
         destination_entry = tk.Entry(
             panel, textvariable=self.destinatie, font=(FONT, 11),
             relief="solid", bd=1, highlightthickness=1,
             highlightbackground=BORDER, highlightcolor=ACCENT_GREEN,
         )
-        destination_entry.pack(fill="x", ipady=8, pady=(0, 10))
+        destination_entry.pack(fill="x", ipady=5, pady=(0, 5))
 
         plecare_row = tk.Frame(panel, bg=WHITE)
-        plecare_row.pack(fill="x", pady=(0, 8))
+        plecare_row.pack(fill="x", pady=(0, 4))
         label(plecare_row, "🕒 Ora plecării (HH:MM):", 10, TEXT, True).pack(side="left", padx=(0, 12))
         tk.Entry(plecare_row, textvariable=self.ora_plecare, width=9,
-                 font=(FONT, 11)).pack(side="left", ipady=5)
+                 font=(FONT, 11)).pack(side="left", ipady=3)
         label(plecare_row, "Două estimări: normală și prudentă (+20% și 5 min)",
               9, MUTED).pack(side="left", padx=15)
 
-        label(panel, "Traficul este evaluat automat când există date reale. Fără date: traseu gri (necunoscut).", 9, MUTED).pack(anchor="w", pady=(0, 8))
+        label(panel, "Traficul Google se vede în Google Maps. În F1VE DR1VE, traficul rămâne «Necunoscut» fără API.",
+              9, MUTED).pack(anchor="w", pady=(0, 4))
+        trafic_live_row = tk.Frame(panel, bg=WHITE)
+        trafic_live_row.pack(fill="x", pady=(0, 3))
+        traffic_button = button(
+            trafic_live_row, "🚦 VERIFICĂ AGLOMERAȚIA ÎN GOOGLE MAPS  ↗",
+            lambda: self.deschide_google_maps(self.selected_route_index, mod_trafic=True),
+            BLUE, TEXT,
+        )
+        traffic_button.configure(pady=6)
+        traffic_button.pack(side="left")
+        label(trafic_live_row, "Straturi → Trafic (în Google Maps)",
+              9, MUTED).pack(side="left", padx=10)
+
         self.route_button = button(
             panel, "Se calculează..." if self.route_busy else "Calculează traseul  →",
             self.porneste_rute, ACCENT_GREEN, WHITE,
         )
-        self.route_button.pack(fill="x", pady=(2, 5))
+        self.route_button.configure(pady=7)
+        self.route_button.pack(fill="x", pady=(1, 2))
         if self.route_busy:
             self.route_button.configure(state="disabled")
         label_status = label(panel, "", 10, MUTED)
         label_status.configure(textvariable=self.route_status, wraplength=730)
-        label_status.pack(anchor="w", pady=(0, 5))
+        label_status.pack(anchor="w", pady=(0, 2))
 
-        # Harta are prioritate vizuală: apare deasupra indicațiilor text.
+        # Compararea rutelor și accesul Google Maps sunt deasupra hărții, mereu vizibile.
+        selector = tk.Frame(panel, bg="#1B3448", highlightbackground=BORDER, highlightthickness=1)
+        selector.pack(fill="x", pady=(2, 4))
+        # Butonul este INTENTIONAT deasupra cardurilor: nu mai dispare sub marginea ferestrei.
+        self.maps_primary_button = button(
+            selector, "↗ GOOGLE MAPS  •  CALCULEAZĂ ÎNTÂI TRASEUL",
+            lambda: self.deschide_google_maps(self.selected_route_index),
+            "#29D5DB", "#092134",
+        )
+        self.maps_primary_button.configure(pady=7)
+        self.maps_primary_button.pack(fill="x", padx=8, pady=(5, 2))
+        self.maps_primary_button.configure(state="disabled")
+        self.route_choices_frame = tk.Frame(selector, bg="#1B3448", padx=7, pady=2)
+        self.route_choices_frame.pack(fill="x")
+        self.arata_optiuni_trasee()
+
         rezultate = tk.Frame(panel, bg="#1B3448", highlightbackground=BORDER, highlightthickness=1)
         rezultate.pack(fill="both", expand=True)
         cap = label(rezultate, "HARTĂ INTERACTIVĂ • TRASEUL TĂU", 10, TEXT, True, PEACH)
         cap.configure(padx=14, pady=9)
         cap.pack(fill="x")
 
+        map_actions = tk.Frame(rezultate, bg="#1B3448")
+        map_actions.pack(fill="x", padx=7, pady=(3, 2))
+        harta_mare_btn = button(
+            map_actions, "⛶  DESCHIDE HARTA MARE  ↗",
+            self.deschide_harta_mare, "#29D5DB", "#092134"
+        )
+        harta_mare_btn.configure(font=(FONT, 13, "bold"), padx=30, pady=16)
+        harta_mare_btn.pack(side="left", padx=(0, 12), pady=(5, 7))
+        label(map_actions, "Mărește harta fără să pierzi rutele sau butonul Google Maps.",
+              9, MUTED).pack(side="left")
+
         if tkintermapview is not None:
             self.route_map = tkintermapview.TkinterMapView(
-                rezultate, width=1050, height=540, corner_radius=0
+                rezultate, width=1050, height=360, corner_radius=0
             )
-            self.route_map.pack(fill="x", expand=False, padx=2, pady=(2, 2))
-            self.route_map.configure(height=320)
+            self.route_map.pack(fill="both", expand=True, padx=2, pady=(2, 2))
+            self.route_map.configure(height=360)
             self.route_map.set_tile_server(
                 "https://a.tile.openstreetmap.org/{z}/{x}/{y}.png",
                 max_zoom=19,
@@ -1051,8 +1445,6 @@ class UniRide(tk.Tk):
             self.route_map = None
             label(rezultate, "Instalează harta: python -m pip install tkintermapview", 10, MUTED).pack(pady=12)
 
-        self.route_choices_frame = tk.Frame(rezultate, bg=WHITE)
-        self.route_choices_frame.pack(fill="x", padx=8, pady=4)
         # Navigator pas-cu-pas: pașii provin din ruta OSRM, nu din exemple fictive.
         nav = tk.Frame(rezultate, bg=BLUE, padx=8, pady=4)
         nav.pack(fill="x", padx=4, pady=(2, 5))
@@ -1617,7 +2009,7 @@ class UniRide(tk.Tk):
             self.route_status.set("⚠ Ora plecării trebuie să fie HH:MM, de exemplu 09:15.")
             return
         self.route_busy = True
-        self.route_status.set("Calculăm traseul prin OSRM; verificăm și adresele...")
+        self.route_status.set("Calculăm variantele OSRM pentru comparare...")
         self.route_text = "Se încarcă rezultatele..."
         self.afiseaza_rute(self.route_text)
         self.route_button.configure(state="disabled", text="Se calculează...")
@@ -1748,32 +2140,169 @@ class UniRide(tk.Tk):
             ))
 
     def arata_optiuni_trasee(self):
-        """Compară două rute; trafic real doar dacă există suficiente observații."""
+        """Afișează cele două opțiuni ÎNAINTE de hartă, cu acțiunea Google Maps vizibilă."""
         frame = getattr(self, "route_choices_frame", None)
         if frame is None or not frame.winfo_exists():
             return
         for copil in frame.winfo_children():
             copil.destroy()
-        culori = {"Liber": ("#DDF5E5", "#218345"),
-                  "Moderat": ("#4B4024", "#FFE08A"),
-                  "Aglomerat": ("#4A2832", "#FF9FA8")}
-        for i, ruta in enumerate(self.route_options):
-            fundal, text_color = culori.get(ruta["trafic"], (BLUE, TEXT))
-            linie = tk.Frame(frame, bg=fundal, padx=10, pady=7)
-            linie.pack(fill="x", pady=2)
-            prefix = "★ Recomandat · " if i == 0 else ""
-            if i == self.selected_route_index: prefix += "✓ Selectat · "
-            tk.Label(linie, text=f"{prefix}Traseul {i+1} · {ruta['km']:.1f} km · {ruta['minute']} min",
-                     font=(FONT, 11, "bold"), bg=fundal, fg=TEXT).pack(side="left")
-            tk.Label(linie, text=f"  ● {ruta['trafic']} (date comunitare: {ruta.get('acoperire',0):.0%} din segmente)",
-                     font=(FONT, 10, "bold"), bg=fundal, fg=text_color).pack(side="left", padx=8)
-            button(linie, "Arată pe hartă", lambda j=i: self.alege_traseu(j), WHITE, TEXT).pack(side="right")
-        if len(self.route_options) < 2:
-            label(frame, "OSRM a furnizat o singură rută distinctă pentru aceste adrese.", 9, MUTED).pack(anchor="w")
+        tk.Label(frame, text="ALEGE RUTA  •  compară înainte de navigare",
+                 bg="#1B3448", fg="#F5FAFF", font=(FONT, 11, "bold"),
+                 anchor="w").pack(fill="x", pady=(0, 3))
+        if not self.route_options:
+            tk.Label(frame, text="Calculează traseul ca să vezi distanța, durata și traficul fiecărei variante.",
+                     bg="#1B3448", fg="#D5E9F5", font=(FONT, 9),
+                     anchor="w").pack(fill="x", pady=(0, 4))
+        else:
+            rand = tk.Frame(frame, bg="#1B3448")
+            rand.pack(fill="x")
+            for i, ruta in enumerate(self.route_options[:2]):
+                selected = i == self.selected_route_index
+                fundal = "#185264" if selected else "#122A40"
+                card = tk.Frame(rand, bg=fundal, padx=10, pady=4,
+                                highlightbackground="#38D8DC" if selected else "#34556B",
+                                highlightthickness=2 if selected else 1)
+                card.pack(side="left", fill="both", expand=True, padx=(0, 7) if i == 0 else (7, 0))
+                tk.Label(card, text=("✓  " if selected else "○  ") + f"RUTA {i+1}" +
+                         ("  • RECOMANDATĂ" if i == 0 else "  • ALTERNATIVĂ"),
+                         bg=fundal, fg="#70F5F4" if selected else "#FFFFFF",
+                         font=(FONT, 11, "bold"), anchor="w").pack(fill="x")
+                trafic = ruta.get("trafic", "Necunoscut")
+                if trafic not in ("Liber", "Moderat", "Aglomerat"):
+                    trafic = "Necunoscut"
+                tk.Label(card, text=f"{ruta['km']:.2f} km   •   {ruta['minute']} min   •   Trafic: {trafic}",
+                         bg=fundal, fg="#EBF7FF", font=(FONT, 11), anchor="w",
+                         wraplength=390).pack(fill="x", pady=(1, 3))
+                choose_button = button(card, "✓ Selectată" if selected else "Alege această rută",
+                       lambda j=i: self.alege_traseu(j),
+                       "#27637B" if selected else ACCENT_GREEN, WHITE)
+                choose_button.configure(pady=6)
+                choose_button.pack(fill="x")
+            if len(self.route_options) < 2:
+                tk.Label(frame, text="OSRM a găsit o singură rută distinctă.",
+                         bg="#1B3448", fg=MUTED, font=(FONT, 9)).pack(anchor="w")
+        tk.Label(frame, text="Traficul apare necunoscut fără date reale. Google Maps își poate calcula propria rută.",
+                 bg="#1B3448", fg="#D5E9F5", font=(FONT, 9), anchor="w").pack(fill="x", pady=(5, 0))
+        if hasattr(self, "maps_primary_button") and self.maps_primary_button.winfo_exists():
+            if self.route_options and getattr(self, "maps_destination_coords", None):
+                self.maps_primary_button.configure(state="normal", text=f"↗ NAVIGHEAZĂ CU GOOGLE MAPS  •  RUTA {self.selected_route_index+1}")
+            else:
+                self.maps_primary_button.configure(state="disabled", text="↗ NAVIGHEAZĂ CU GOOGLE MAPS  •  CALCULEAZĂ TRASEUL")
+
+    def deschide_google_maps(self, index=None, mod_trafic=False):
+        """Deschide Google Maps cu plecare, destinație și un reper via orientativ.
+
+        Google Maps recalculează ruta; un singur waypoint NU impune geometria OSRM.
+        """
+        import webbrowser
+        from urllib.parse import urlencode
+        if index is not None:
+            self.selected_route_index = index
+        final = getattr(self, "maps_destination_coords", None)
+        params = {"api": "1", "travelmode": "driving"}
+        if final:
+            lon, lat = final  # OSRM: (lon, lat)
+            params["destination"] = f"{lat:.7f},{lon:.7f}"
+            start = getattr(self, "maps_origin_coords", None)
+            if start:
+                start_lon, start_lat = start
+                params["origin"] = f"{start_lat:.7f},{start_lon:.7f}"
+        elif mod_trafic:
+            # Traffic view must be available even before calling the OSRM router.
+            origine_text = self.origine.get().strip()
+            destinatie_text = self.destinatie.get().strip()
+            if not origine_text or not destinatie_text:
+                messagebox.showwarning("Google Maps", "Completează plecarea și destinația.", parent=self)
+                return
+            params["origin"] = origine_text
+            params["destination"] = destinatie_text
+        else:
+            messagebox.showwarning("Google Maps", "Calculează întâi traseul.", parent=self)
+            return
+
+        # Un punct intermediar orientativ, la mijlocul DISTANȚEI pe ruta selectată.
+        # Punctul poate influența traseul Google Maps, dar nu îl fixează exact.
+        reper = None
+        if 0 <= self.selected_route_index < len(self.route_options):
+            puncte = self.route_options[self.selected_route_index].get("puncte", [])
+            if len(puncte) >= 3:
+                import math
+                def metri(a, b):
+                    lat1, lon1 = a
+                    lat2, lon2 = b
+                    dy = (lat2 - lat1) * 111195.0
+                    dx = (lon2 - lon1) * 111195.0 * math.cos(math.radians((lat1 + lat2) / 2))
+                    return math.hypot(dx, dy)
+                total = sum(metri(puncte[k-1], puncte[k]) for k in range(1, len(puncte)))
+                parcurs = 0.0
+                for k in range(1, len(puncte)):
+                    parcurs += metri(puncte[k-1], puncte[k])
+                    if parcurs >= total / 2:
+                        reper = puncte[k]
+                        break
+                if reper and total >= 600:
+                    params["waypoints"] = f"{reper[0]:.7f},{reper[1]:.7f}"
+        url = "https://www.google.com/maps/dir/?" + urlencode(params)
+        if mod_trafic:
+            mesaj = (
+                "Se deschide Google Maps cu plecarea și destinația.\n\n"
+                "În Google Maps, apasă «Straturi» → «Trafic» pentru a vedea "
+                "aglomerația pe străzi în timp real (dacă există date).\n\n"
+                "Google Maps își calculează propria rută; nu garantează "
+                "traseul OSRM selectat.\n\nDeschidem Google Maps?"
+            )
+        else:
+            mesaj = ("Se deschide Google Maps cu plecarea și destinația" +
+                     (" și un punct intermediar orientativ de pe ruta aleasă" if "waypoints" in params else "") +
+                     ".\n\nGoogle Maps poate recalcula un alt drum; nu se poate transfera "
+                     "garantat traseul exact din F1VE DR1VE.\n\nContinuăm?")
+        if messagebox.askokcancel("Deschide Google Maps", mesaj, parent=self):
+            if not webbrowser.open(url):
+                messagebox.showinfo("Google Maps", "Deschide acest link în browser:\n" + url, parent=self)
 
     @staticmethod
     def culoare_trafic(stare):
         return {"Liber": "#28A745", "Moderat": "#E5B700", "Aglomerat": "#D32F2F"}.get(stare, "#748697")
+
+    def deschide_harta_mare(self):
+        """Fereastră de hartă mare; folosește rutele existente, fără recalculare."""
+        if tkintermapview is None:
+            messagebox.showwarning("Hartă", "Instalează tkintermapview pentru afișarea hărții.", parent=self)
+            return
+        fereastra = tk.Toplevel(self)
+        fereastra.title("F1VE DR1VE • Hartă mare")
+        fereastra.geometry("1250x800")
+        fereastra.configure(bg="#0B1D30")
+        bara = tk.Frame(fereastra, bg="#122A40", padx=12, pady=9)
+        bara.pack(fill="x")
+        tk.Label(bara, text="F1VE DR1VE  •  HARTĂ INTERACTIVĂ",
+                 bg="#122A40", fg="#64E9EB", font=(FONT, 14, "bold")).pack(side="left")
+        button(bara, "Navighează cu Google Maps ↗",
+               lambda: self.deschide_google_maps(self.selected_route_index),
+               "#29D5DB", "#092134").pack(side="right", padx=6)
+        if not self.route_options:
+            tk.Label(bara, text="Calculează mai întâi un traseu în pagina principală.",
+                     bg="#122A40", fg=TEXT).pack(side="right", padx=12)
+        harta = tkintermapview.TkinterMapView(fereastra, width=1200, height=700, corner_radius=0)
+        harta.pack(fill="both", expand=True, padx=9, pady=9)
+        harta.set_tile_server("https://a.tile.openstreetmap.org/{z}/{x}/{y}.png", max_zoom=19)
+        if self.route_options:
+            toate = []
+            for i, ruta in reversed(list(enumerate(self.route_options[:2]))):
+                puncte = ruta.get("puncte", [])
+                if len(puncte) > 1:
+                    toate.extend(puncte)
+                    harta.set_path(self.puncte_pentru_harta(puncte),
+                                   color=self.culoare_trafic(ruta.get("trafic")),
+                                   width=8 if i == self.selected_route_index else 5)
+            if toate:
+                harta.set_marker(toate[0][0], toate[0][1], text="Plecare")
+                harta.set_marker(toate[-1][0], toate[-1][1], text="Destinație")
+                harta.fit_bounding_box((max(a for a,b in toate), min(b for a,b in toate)),
+                                       (min(a for a,b in toate), max(b for a,b in toate)))
+        else:
+            harta.set_position(47.1585, 27.6014)
+            harta.set_zoom(12)
 
     def alege_traseu(self, index):
         if index >= len(self.route_options):
@@ -1783,12 +2312,12 @@ class UniRide(tk.Tk):
         harta = getattr(self, "route_map", None)
         if harta is not None and harta.winfo_exists() and len(ruta["puncte"]) > 1:
             harta.delete_all_path()
-            harta.set_path(ruta["puncte"], color=self.culoare_trafic(ruta["trafic"]), width=6)
+            harta.set_path(self.puncte_pentru_harta(ruta["puncte"]), color=self.culoare_trafic(ruta["trafic"]), width=6)
             puncte = ruta["puncte"]
             harta.fit_bounding_box((max(x for x,y in puncte), min(y for x,y in puncte)),
                                    (min(x for x,y in puncte), max(y for x,y in puncte)))
         self.arata_optiuni_trasee()
-        self.route_status.set("Rută selectată pentru afișare. Navigația vocală este disponibilă doar pe ruta OSRM cea mai rapidă.")
+        self.route_status.set("Ruta selectată. Butonul Google Maps este deasupra rutelor; Maps poate recalcula drumul.")
 
     @staticmethod
     def puncte_pentru_harta(puncte, limita=650):
@@ -1851,6 +2380,8 @@ class UniRide(tk.Tk):
                 if mesaj[0] == "ROUTE_OK":
                     _, self.route_text, status, puncte, start, final, self.nav_steps, self.route_options = mesaj
                     self.selected_route_index = 0
+                    self.maps_destination_coords = final
+                    self.maps_origin_coords = start
                     self.arata_optiuni_trasee()
                     self.nav_index = 0
                 else:
@@ -1879,9 +2410,8 @@ class UniRide(tk.Tk):
                         )
                 self.route_status.set(status)
                 self.arata_pasul()
-                if puncte is not None:
-                    # Navigatia 3D ramane implicita; o lansam dupa ce Tk a actualizat UI.
-                    self.after(80, lambda p=puncte, a=start, b=final: self._deschide_navigatia_sigur(p, a, b))
+                # Nu deschidem automat navigația 3D. Utilizatorul compară
+                # variantele și decide dacă deschide destinația în Google Maps.
         except queue.Empty:
             pass
         self.after(150, self.verifica_rute)
@@ -1951,7 +2481,7 @@ class UniRide(tk.Tk):
         w = label(aviso, "Înainte de a contacta pe cineva, vei primi o avertizare și ți se va cere acordul. "
                   "Nu publica adresa exactă sau coordonatele dispozitivului.", 10, "#FF9FA8")
         w.configure(wraplength=850)
-        w.pack(anchor="w", pady=(5, 0))
+        w.pack(anchor="w", pady=(2, 0))
 
         form = card(outer)
         form.pack(fill="x", pady=(0, 9))
@@ -2291,10 +2821,11 @@ def porneste_server_trafic_local():
     exec(compile(_TRAFFIC_SERVER_SOURCE, __file__ + ":traffic", "exec"), namespace)
     uvicorn.run(namespace["app"], host="127.0.0.1", port=8765, log_level="warning")
 
+
+
+_F1VE_MAPLIBRE_HTML = '<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n<title>F1VE DR1VE • Navigație 3D</title><link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">\n<style>html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;background:#101d30;color:white}\n#top{position:absolute;top:18px;left:18px;right:18px;z-index:4;background:linear-gradient(110deg,#123550,#155e7d);border:1px solid #5ce8ef66;border-radius:18px;padding:15px 18px;box-shadow:0 8px 25px #0009}\n#instruction{font-size:23px;font-weight:800}#status{font-size:13px;color:#b9e5ee;margin-top:4px}\n#bottom{position:absolute;bottom:15px;left:15px;right:15px;z-index:4;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}\n.pill{background:#11283dec;border:1px solid #66849b66;border-radius:17px;padding:10px 15px;box-shadow:0 6px 25px #0007;backdrop-filter:blur(12px)}\n.stat{font-size:21px;font-weight:800;color:white}.small{font-size:12px;color:#a8cddd}button{background:#31dce6;color:#08263a;border:0;border-radius:12px;padding:11px 14px;font-weight:800;cursor:pointer}button.off{background:#324a60;color:white}\n#car{width:46px;height:74px;position:absolute;z-index:3;pointer-events:none;transform:translate(-50%,-50%);filter:drop-shadow(0 7px 8px #0009)}\n#car svg{width:100%;height:100%}#hint{position:absolute;top:120px;left:18px;z-index:3;background:#13283ddd;border-radius:10px;padding:8px 11px;font-size:12px;color:#d3f8ff}\n@media(max-width:700px){#instruction{font-size:18px}#top{left:9px;right:9px;top:8px}#bottom{left:7px;right:7px;bottom:8px;gap:5px}.pill{padding:8px}.stat{font-size:17px}button{padding:9px}#hint{top:100px}}\n</style></head><body><div id="map"></div><div id="top"><div id="instruction">↗ Traseul este pregătit</div><div id="status">Apasă „Pornește GPS” pentru urmărire reală</div></div><div id="hint">Perspectivă 3D • fără simularea mișcării</div><div id="car" hidden><svg viewBox="0 0 46 74"><ellipse cx="23" cy="37" rx="22" ry="35" fill="#081b2c" opacity=".65"/><rect x="7" y="4" width="32" height="65" rx="13" fill="#fa728e" stroke="#ffe5e9" stroke-width="3"/><rect x="12" y="17" width="22" height="18" rx="5" fill="#183c56"/><rect x="12" y="47" width="22" height="12" rx="4" fill="#183c56"/><path d="M23 0 L15 12 L31 12 Z" fill="#50e8f0"/></svg></div>\n<div id="bottom"><div class="pill"><div class="small">SOSIRE ESTIMATĂ</div><div class="stat" id="eta">—</div></div><div class="pill"><div class="small">DISTANȚĂ RĂMASĂ</div><div class="stat" id="distance">—</div></div><div class="pill"><div class="small">VITEZĂ GPS</div><div class="stat" id="speed">—</div></div><div class="pill"><button id="gps" onclick="toggleGPS()">📍 Pornește GPS</button> <button id="voice" onclick="toggleVoice()">🔊 Voce ON</button> <button class="off" onclick="overview()">Hartă completă</button></div></div>\n<script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script><script>\nconst data=__F1VE_DATA__, coords=data.route;let watch=null,voice=true,last=null,heading=0,lastVoice=\'\',lastVoiceAt=0,following=false,routeKm=0;\nconst $=id=>document.getElementById(id);const rad=x=>x*Math.PI/180;\nfunction meters(a,b){let dlat=rad(b[1]-a[1]),dlon=rad(b[0]-a[0]),v=Math.sin(dlat/2)**2+Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*Math.sin(dlon/2)**2;return 12742000*Math.asin(Math.min(1,Math.sqrt(v)))}\nfunction bearing(a,b){let y=Math.sin(rad(b[0]-a[0]))*Math.cos(rad(b[1])),x=Math.cos(rad(a[1]))*Math.sin(rad(b[1]))-Math.sin(rad(a[1]))*Math.cos(rad(b[1]))*Math.cos(rad(b[0]-a[0]));return (Math.atan2(y,x)*180/Math.PI+360)%360}\nfor(let i=1;i<coords.length;i++)routeKm+=meters(coords[i-1],coords[i])/1000;\nconst map=new maplibregl.Map({container:\'map\',style:\'https://tiles.openfreemap.org/styles/liberty\',center:coords[0],zoom:15,pitch:62,bearing:0,antialias:true});\nmap.addControl(new maplibregl.NavigationControl({showCompass:true}),\'top-right\');\nmap.on(\'error\',e=>{$(\'status\').textContent=\'Eroare încărcare hartă: verifică internetul sau serviciul de hărți\';console.error(e.error||e)});\nmap.on(\'load\',()=>{try{const s=map.getStyle();if(s.sources.openmaptiles){let first=(s.layers||[]).find(x=>x.type===\'symbol\');map.addLayer({id:\'f1ve-3d-buildings\',type:\'fill-extrusion\',source:\'openmaptiles\',\'source-layer\':\'building\',minzoom:14,paint:{\'fill-extrusion-color\':\'#7d98ae\',\'fill-extrusion-height\':[\'interpolate\',[\'linear\'],[\'zoom\'],14,0,15,[\'coalesce\',[\'get\',\'render_height\'],[\'get\',\'height\'],8]],\'fill-extrusion-opacity\':0.58}},first&&first.id)}}catch(e){console.log(\'Clădiri 3D indisponibile\',e)}\nmap.addSource(\'f1ve-route\',{type:\'geojson\',data:{type:\'Feature\',geometry:{type:\'LineString\',coordinates:coords}}});map.addLayer({id:\'f1ve-glow\',type:\'line\',source:\'f1ve-route\',paint:{\'line-color\':\'#0c617a\',\'line-width\':18,\'line-opacity\':0.75}});map.addLayer({id:\'f1ve-line\',type:\'line\',source:\'f1ve-route\',paint:{\'line-color\':\'#44f4f0\',\'line-width\':9,\'line-opacity\':0.98}});new maplibregl.Marker({color:\'#fb7185\'}).setLngLat(coords[coords.length-1]).addTo(map);overview();$(\'distance\').textContent=routeKm.toFixed(1)+\' km\';setTimeout(()=>{if(watch===null)toggleGPS()},700);});\nfunction overview(){following=false;const bounds=new maplibregl.LngLatBounds(coords[0],coords[0]);coords.forEach(c=>bounds.extend(c));map.fitBounds(bounds,{padding:110,duration:900,pitch:45,bearing:0});$(\'status\').textContent=\'Hartă generală • apasă GPS pentru camera din mers\'}\nfunction closest(pos){let best=Infinity,idx=0,tbest=0;for(let i=0;i<coords.length-1;i++){const a=coords[i],b=coords[i+1],sx=111320*Math.cos(rad(pos[1])),sy=111195,dx=(b[0]-a[0])*sx,dy=(b[1]-a[1])*sy,t=Math.max(0,Math.min(1,((pos[0]-a[0])*sx*dx+(pos[1]-a[1])*sy*dy)/(dx*dx+dy*dy||1))),p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],d=meters(pos,p);if(d<best){best=d;idx=i;tbest=t}}let remaining=meters([coords[idx][0]+(coords[idx+1][0]-coords[idx][0])*tbest,coords[idx][1]+(coords[idx+1][1]-coords[idx][1])*tbest],coords[idx+1]);for(let i=idx+2;i<coords.length;i++)remaining+=meters(coords[i-1],coords[i]);return {remaining,off:best,idx}}\nfunction say(s){if(!voice||!(\'speechSynthesis\'in window))return;let now=Date.now();if(s===lastVoice&&now-lastVoiceAt<25000)return;lastVoice=s;lastVoiceAt=now;speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(s);u.lang=\'ro-RO\';u.rate=1.08;let v=speechSynthesis.getVoices().find(v=>v.lang.toLowerCase().startsWith(\'ro\'));if(v)u.voice=v;speechSynthesis.speak(u)}\nfunction fix(p){const c=p.coords,pos=[c.longitude,c.latitude],acc=c.accuracy||9999,spd=c.speed!=null&&c.speed>=0?c.speed*3.6:null;if(last&&meters(last.pos,pos)>7&&meters(last.pos,pos)<150&&p.timestamp>last.ts)heading=Number.isFinite(c.heading)?c.heading:bearing(last.pos,pos);else if(Number.isFinite(c.heading))heading=c.heading;last={pos,ts:p.timestamp};$(\'speed\').textContent=spd==null?\'—\':Math.round(spd)+\' km/h\';const near=closest(pos);$(\'distance\').textContent=(near.remaining>=1000?(near.remaining/1000).toFixed(1)+\' km\':Math.round(near.remaining)+\' m\');let speedForEta=spd&&spd>8?spd:30,minutes=Math.ceil(near.remaining/1000/speedForEta*60);$(\'eta\').textContent=new Date(Date.now()+minutes*60000).toLocaleTimeString(\'ro-RO\',{hour:\'2-digit\',minute:\'2-digit\'});if(acc>60){$(\'status\').textContent=\'GPS imprecis (\'+Math.round(acc)+\' m) • navigație nesigură\';$(\'instruction\').textContent=\'⚠ Precizie GPS insuficientă\';return}\nif(near.off>70){$(\'instruction\').textContent=\'⚠ Te-ai îndepărtat de traseu\';$(\'status\').textContent=\'La \'+Math.round(near.off)+\' m de traseu • recalcularea nu este activă\';say(\'Atenție, ai ieșit de pe traseu. Verifică drumul.\')}else{$(\'instruction\').textContent=near.remaining<35?\'🏁 Ai ajuns aproape de destinație\':\'↗ Urmează traseul turcoaz\';$(\'status\').textContent=\'GPS \'+Math.round(acc)+\' m • \'+Math.round(near.remaining)+\' m rămași\';if(near.remaining<35)say(\'Ai ajuns aproape de destinație.\')}following=true;const point=map.project(pos);$(\'car\').hidden=false;$(\'car\').style.left=\'50%\';$(\'car\').style.top=\'69%\';$(\'car\').style.transform=\'translate(-50%,-50%)\';map.easeTo({center:pos,bearing:heading,pitch:65,zoom:17.5,duration:950,essential:true,padding:{top:100,bottom:Math.round(innerHeight*.30),left:0,right:0}})}\nfunction toggleGPS(){if(watch!==null){navigator.geolocation.clearWatch(watch);watch=null;following=false;$(\'gps\').textContent=\'📍 Pornește GPS\';$(\'status\').textContent=\'Urmărire GPS oprită\';return}if(!navigator.geolocation){$(\'status\').textContent=\'Browserul nu permite geolocalizare\';return}watch=navigator.geolocation.watchPosition(fix,e=>{$(\'status\').textContent=\'GPS indisponibil: \'+e.message},{enableHighAccuracy:true,maximumAge:1000,timeout:12000});$(\'gps\').textContent=\'⏹ Oprește GPS\'}\nfunction toggleVoice(){voice=!voice;$(\'voice\').textContent=voice?\'🔊 Voce ON\':\'🔇 Voce OFF\';if(!voice&&speechSynthesis)speechSynthesis.cancel()}\n</script></body></html>'
+
 if __name__ == "__main__":
     threading.Thread(target=porneste_server_trafic_local, daemon=True, name="F1VE DR1VETrafficLocal").start()
     app = UniRide()
     app.mainloop()
-
-
-_F1VE_MAPLIBRE_HTML = '<!doctype html><html lang="ro"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">\n<title>F1VE DR1VE • Navigație 3D</title><link href="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.css" rel="stylesheet">\n<style>html,body,#map{margin:0;width:100%;height:100%;overflow:hidden;font-family:Segoe UI,Arial,sans-serif;background:#101d30;color:white}\n#top{position:absolute;top:18px;left:18px;right:18px;z-index:4;background:linear-gradient(110deg,#123550,#155e7d);border:1px solid #5ce8ef66;border-radius:18px;padding:15px 18px;box-shadow:0 8px 25px #0009}\n#instruction{font-size:23px;font-weight:800}#status{font-size:13px;color:#b9e5ee;margin-top:4px}\n#bottom{position:absolute;bottom:15px;left:15px;right:15px;z-index:4;display:flex;gap:10px;align-items:stretch;flex-wrap:wrap}\n.pill{background:#11283dec;border:1px solid #66849b66;border-radius:17px;padding:10px 15px;box-shadow:0 6px 25px #0007;backdrop-filter:blur(12px)}\n.stat{font-size:21px;font-weight:800;color:white}.small{font-size:12px;color:#a8cddd}button{background:#31dce6;color:#08263a;border:0;border-radius:12px;padding:11px 14px;font-weight:800;cursor:pointer}button.off{background:#324a60;color:white}\n#car{width:46px;height:74px;position:absolute;z-index:3;pointer-events:none;transform:translate(-50%,-50%);filter:drop-shadow(0 7px 8px #0009)}\n#car svg{width:100%;height:100%}#hint{position:absolute;top:120px;left:18px;z-index:3;background:#13283ddd;border-radius:10px;padding:8px 11px;font-size:12px;color:#d3f8ff}\n@media(max-width:700px){#instruction{font-size:18px}#top{left:9px;right:9px;top:8px}#bottom{left:7px;right:7px;bottom:8px;gap:5px}.pill{padding:8px}.stat{font-size:17px}button{padding:9px}#hint{top:100px}}\n</style></head><body><div id="map"></div><div id="top"><div id="instruction">↗ Traseul este pregătit</div><div id="status">Apasă „Pornește GPS” pentru urmărire reală</div></div><div id="hint">Perspectivă 3D • fără simularea mișcării</div><div id="car" hidden><svg viewBox="0 0 46 74"><ellipse cx="23" cy="37" rx="22" ry="35" fill="#081b2c" opacity=".65"/><rect x="7" y="4" width="32" height="65" rx="13" fill="#fa728e" stroke="#ffe5e9" stroke-width="3"/><rect x="12" y="17" width="22" height="18" rx="5" fill="#183c56"/><rect x="12" y="47" width="22" height="12" rx="4" fill="#183c56"/><path d="M23 0 L15 12 L31 12 Z" fill="#50e8f0"/></svg></div>\n<div id="bottom"><div class="pill"><div class="small">SOSIRE ESTIMATĂ</div><div class="stat" id="eta">—</div></div><div class="pill"><div class="small">DISTANȚĂ RĂMASĂ</div><div class="stat" id="distance">—</div></div><div class="pill"><div class="small">VITEZĂ GPS</div><div class="stat" id="speed">—</div></div><div class="pill"><button id="gps" onclick="toggleGPS()">📍 Pornește GPS</button> <button id="voice" onclick="toggleVoice()">🔊 Voce ON</button> <button class="off" onclick="overview()">Hartă completă</button></div></div>\n<script src="https://unpkg.com/maplibre-gl@5.6.2/dist/maplibre-gl.js"></script><script>\nconst data=__F1VE_DATA__, coords=data.route;let watch=null,voice=true,last=null,heading=0,lastVoice=\'\',lastVoiceAt=0,following=false,routeKm=0;\nconst $=id=>document.getElementById(id);const rad=x=>x*Math.PI/180;\nfunction meters(a,b){let dlat=rad(b[1]-a[1]),dlon=rad(b[0]-a[0]),v=Math.sin(dlat/2)**2+Math.cos(rad(a[1]))*Math.cos(rad(b[1]))*Math.sin(dlon/2)**2;return 12742000*Math.asin(Math.min(1,Math.sqrt(v)))}\nfunction bearing(a,b){let y=Math.sin(rad(b[0]-a[0]))*Math.cos(rad(b[1])),x=Math.cos(rad(a[1]))*Math.sin(rad(b[1]))-Math.sin(rad(a[1]))*Math.cos(rad(b[1]))*Math.cos(rad(b[0]-a[0]));return (Math.atan2(y,x)*180/Math.PI+360)%360}\nfor(let i=1;i<coords.length;i++)routeKm+=meters(coords[i-1],coords[i])/1000;\nconst map=new maplibregl.Map({container:\'map\',style:\'https://tiles.openfreemap.org/styles/liberty\',center:coords[0],zoom:15,pitch:62,bearing:0,antialias:true});\nmap.addControl(new maplibregl.NavigationControl({showCompass:true}),\'top-right\');\nmap.on(\'error\',e=>{$(\'status\').textContent=\'Eroare încărcare hartă: verifică internetul sau serviciul de hărți\';console.error(e.error||e)});\nmap.on(\'load\',()=>{try{const s=map.getStyle();if(s.sources.openmaptiles){let first=(s.layers||[]).find(x=>x.type===\'symbol\');map.addLayer({id:\'f1ve-3d-buildings\',type:\'fill-extrusion\',source:\'openmaptiles\',\'source-layer\':\'building\',minzoom:14,paint:{\'fill-extrusion-color\':\'#7d98ae\',\'fill-extrusion-height\':[\'interpolate\',[\'linear\'],[\'zoom\'],14,0,15,[\'coalesce\',[\'get\',\'render_height\'],[\'get\',\'height\'],8]],\'fill-extrusion-opacity\':0.58}},first&&first.id)}}catch(e){console.log(\'Clădiri 3D indisponibile\',e)}\nmap.addSource(\'f1ve-route\',{type:\'geojson\',data:{type:\'Feature\',geometry:{type:\'LineString\',coordinates:coords}}});map.addLayer({id:\'f1ve-glow\',type:\'line\',source:\'f1ve-route\',paint:{\'line-color\':\'#0c617a\',\'line-width\':18,\'line-opacity\':0.75}});map.addLayer({id:\'f1ve-line\',type:\'line\',source:\'f1ve-route\',paint:{\'line-color\':\'#44f4f0\',\'line-width\':9,\'line-opacity\':0.98}});new maplibregl.Marker({color:\'#fb7185\'}).setLngLat(coords[coords.length-1]).addTo(map);overview();$(\'distance\').textContent=routeKm.toFixed(1)+\' km\';setTimeout(()=>{if(watch===null)toggleGPS()},700);});\nfunction overview(){following=false;const bounds=new maplibregl.LngLatBounds(coords[0],coords[0]);coords.forEach(c=>bounds.extend(c));map.fitBounds(bounds,{padding:110,duration:900,pitch:45,bearing:0});$(\'status\').textContent=\'Hartă generală • apasă GPS pentru camera din mers\'}\nfunction closest(pos){let best=Infinity,idx=0,tbest=0;for(let i=0;i<coords.length-1;i++){const a=coords[i],b=coords[i+1],sx=111320*Math.cos(rad(pos[1])),sy=111195,dx=(b[0]-a[0])*sx,dy=(b[1]-a[1])*sy,t=Math.max(0,Math.min(1,((pos[0]-a[0])*sx*dx+(pos[1]-a[1])*sy*dy)/(dx*dx+dy*dy||1))),p=[a[0]+(b[0]-a[0])*t,a[1]+(b[1]-a[1])*t],d=meters(pos,p);if(d<best){best=d;idx=i;tbest=t}}let remaining=meters([coords[idx][0]+(coords[idx+1][0]-coords[idx][0])*tbest,coords[idx][1]+(coords[idx+1][1]-coords[idx][1])*tbest],coords[idx+1]);for(let i=idx+2;i<coords.length;i++)remaining+=meters(coords[i-1],coords[i]);return {remaining,off:best,idx}}\nfunction say(s){if(!voice||!(\'speechSynthesis\'in window))return;let now=Date.now();if(s===lastVoice&&now-lastVoiceAt<25000)return;lastVoice=s;lastVoiceAt=now;speechSynthesis.cancel();let u=new SpeechSynthesisUtterance(s);u.lang=\'ro-RO\';u.rate=1.08;let v=speechSynthesis.getVoices().find(v=>v.lang.toLowerCase().startsWith(\'ro\'));if(v)u.voice=v;speechSynthesis.speak(u)}\nfunction fix(p){const c=p.coords,pos=[c.longitude,c.latitude],acc=c.accuracy||9999,spd=c.speed!=null&&c.speed>=0?c.speed*3.6:null;if(last&&meters(last.pos,pos)>7&&meters(last.pos,pos)<150&&p.timestamp>last.ts)heading=Number.isFinite(c.heading)?c.heading:bearing(last.pos,pos);else if(Number.isFinite(c.heading))heading=c.heading;last={pos,ts:p.timestamp};$(\'speed\').textContent=spd==null?\'—\':Math.round(spd)+\' km/h\';const near=closest(pos);$(\'distance\').textContent=(near.remaining>=1000?(near.remaining/1000).toFixed(1)+\' km\':Math.round(near.remaining)+\' m\');let speedForEta=spd&&spd>8?spd:30,minutes=Math.ceil(near.remaining/1000/speedForEta*60);$(\'eta\').textContent=new Date(Date.now()+minutes*60000).toLocaleTimeString(\'ro-RO\',{hour:\'2-digit\',minute:\'2-digit\'});if(acc>60){$(\'status\').textContent=\'GPS imprecis (\'+Math.round(acc)+\' m) • navigație nesigură\';$(\'instruction\').textContent=\'⚠ Precizie GPS insuficientă\';return}\nif(near.off>70){$(\'instruction\').textContent=\'⚠ Te-ai îndepărtat de traseu\';$(\'status\').textContent=\'La \'+Math.round(near.off)+\' m de traseu • recalcularea nu este activă\';say(\'Atenție, ai ieșit de pe traseu. Verifică drumul.\')}else{$(\'instruction\').textContent=near.remaining<35?\'🏁 Ai ajuns aproape de destinație\':\'↗ Urmează traseul turcoaz\';$(\'status\').textContent=\'GPS \'+Math.round(acc)+\' m • \'+Math.round(near.remaining)+\' m rămași\';if(near.remaining<35)say(\'Ai ajuns aproape de destinație.\')}following=true;const point=map.project(pos);$(\'car\').hidden=false;$(\'car\').style.left=\'50%\';$(\'car\').style.top=\'69%\';$(\'car\').style.transform=\'translate(-50%,-50%)\';map.easeTo({center:pos,bearing:heading,pitch:65,zoom:17.5,duration:950,essential:true,padding:{top:100,bottom:Math.round(innerHeight*.30),left:0,right:0}})}\nfunction toggleGPS(){if(watch!==null){navigator.geolocation.clearWatch(watch);watch=null;following=false;$(\'gps\').textContent=\'📍 Pornește GPS\';$(\'status\').textContent=\'Urmărire GPS oprită\';return}if(!navigator.geolocation){$(\'status\').textContent=\'Browserul nu permite geolocalizare\';return}watch=navigator.geolocation.watchPosition(fix,e=>{$(\'status\').textContent=\'GPS indisponibil: \'+e.message},{enableHighAccuracy:true,maximumAge:1000,timeout:12000});$(\'gps\').textContent=\'⏹ Oprește GPS\'}\nfunction toggleVoice(){voice=!voice;$(\'voice\').textContent=voice?\'🔊 Voce ON\':\'🔇 Voce OFF\';if(!voice&&speechSynthesis)speechSynthesis.cancel()}\n</script></body></html>'
