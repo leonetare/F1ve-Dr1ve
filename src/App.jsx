@@ -1,122 +1,61 @@
 import { useState } from 'react'
-import heroImg from './assets/hero.png'
-import reactLogo from './assets/react.svg'
-import viteLogo from './assets/vite.svg'
 import './App.css'
 
-function App() {
-  const [count, setCount] = useState(0)
-
-  return (
-    <>
-      <section id="center">
-        <div className="hero">
-          <img src={heroImg} className="base" width="170" height="179" alt="" />
-          <img src={reactLogo} className="framework" alt="React logo" />
-          <img src={viteLogo} className="vite" alt="Vite logo" />
-        </div>
-        <div>
-          <h1>Get started</h1>
-          <p>
-            Edit <code>src/App.jsx</code> and save to test <code>HMR</code>
-          </p>
-        </div>
-        <button
-          type="button"
-          className="counter"
-          onClick={() => setCount((count) => count + 1)}
-        >
-          Count is {count}
-        </button>
-      </section>
-
-      <div className="ticks"></div>
-
-      <section id="next-steps">
-        <div id="docs">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#documentation-icon"></use>
-          </svg>
-          <h2>Documentation</h2>
-          <p>Your questions, answered</p>
-          <ul>
-            <li>
-              <a href="https://vite.dev/" target="_blank">
-                <img className="logo" src={viteLogo} alt="" />
-                Explore Vite
-              </a>
-            </li>
-            <li>
-              <a href="https://react.dev/" target="_blank">
-                <img className="button-icon" src={reactLogo} alt="" />
-                Learn more
-              </a>
-            </li>
-          </ul>
-        </div>
-        <div id="social">
-          <svg className="icon" role="presentation" aria-hidden="true">
-            <use href="/icons.svg#social-icon"></use>
-          </svg>
-          <h2>Connect with us</h2>
-          <p>Join the Vite community</p>
-          <ul>
-            <li>
-              <a href="https://github.com/vitejs/vite" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#github-icon"></use>
-                </svg>
-                GitHub
-              </a>
-            </li>
-            <li>
-              <a href="https://chat.vite.dev/" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#discord-icon"></use>
-                </svg>
-                Discord
-              </a>
-            </li>
-            <li>
-              <a href="https://x.com/vite_js" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#x-icon"></use>
-                </svg>
-                X.com
-              </a>
-            </li>
-            <li>
-              <a href="https://bsky.app/profile/vite.dev" target="_blank">
-                <svg
-                  className="button-icon"
-                  role="presentation"
-                  aria-hidden="true"
-                >
-                  <use href="/icons.svg#bluesky-icon"></use>
-                </svg>
-                Bluesky
-              </a>
-            </li>
-          </ul>
-        </div>
-      </section>
-
-      <div className="ticks"></div>
-      <section id="spacer"></section>
-    </>
-  )
+const navigation = [['home', '⌂', 'Acasă'], ['routes', '↗', 'Traseele mele'], ['rides', '♧', 'Curse comune'], ['schedule', '▦', 'Orarul meu'], ['settings', '⚙', 'Setări']]
+function useSaved(key, initial) {
+  const [value, update] = useState(() => { try { return JSON.parse(localStorage.getItem(key)) ?? initial } catch { return initial } })
+  function save(next) { update(next); try { localStorage.setItem(key, JSON.stringify(next)) } catch { /* Session remains usable without storage. */ } }
+  return [value, save]
 }
-
-export default App
+const mapUrl = (place) => `https://maps.google.com/maps?q=${encodeURIComponent(place)}&z=13&output=embed`
+const directions = (from, to) => `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(from)}&destination=${encodeURIComponent(to)}&travelmode=driving`
+export default function App() {
+  const [page, setPage] = useState('home')
+  const [theme, setTheme] = useSaved('f1ve-theme', 'dark')
+  const [name, setName] = useSaved('f1ve-name', '')
+  const [history, setHistory] = useSaved('f1ve-routes', [])
+  const [rides, setRides] = useSaved('f1ve-rides', [])
+  const [classes, setClasses] = useSaved('f1ve-classes', [])
+  const [from, setFrom] = useState('')
+  const [to, setTo] = useState('')
+  const [time, setTime] = useState('08:00')
+  const [map, setMap] = useState('Iași, România')
+  const [selected, setSelected] = useState(null)
+  const [notice, setNotice] = useState('')
+  const [modal, setModal] = useState(false)
+  const [filter, setFilter] = useState('')
+  function plan(e) {
+    e.preventDefault()
+    const route = { id: crypto.randomUUID(), from: from.trim(), to: to.trim(), time, date: new Date().toLocaleDateString('ro-RO') }
+    if (!route.from || !route.to) return
+    setSelected(route); setMap(route.to); setHistory([route, ...history].slice(0, 30)); setNotice('Traseu salvat. Deschide navigarea pentru ruta și durata actualizate.')
+  }
+  function locate() {
+    if (!navigator.geolocation) return setNotice('Localizarea nu este disponibilă în acest browser.')
+    setNotice('Se caută locația…')
+    navigator.geolocation.getCurrentPosition(({ coords }) => { setFrom(`${coords.latitude.toFixed(5)}, ${coords.longitude.toFixed(5)}`); setNotice('Locația a fost completată. Alege destinația.') }, () => setNotice('Locația nu a putut fi citită. Permite accesul sau introdu manual plecarea.'), { timeout: 10000 })
+  }
+  function publish(e) {
+    e.preventDefault(); const data = Object.fromEntries(new FormData(e.currentTarget))
+    setRides([{ ...data, id: crypto.randomUUID(), seats: Number(data.seats) }, ...rides]); setModal(false); setNotice('Cursa a fost salvată pe acest dispozitiv.')
+  }
+  function addClass(e) { e.preventDefault(); const data = Object.fromEntries(new FormData(e.currentTarget)); setClasses([...classes, { ...data, id: crypto.randomUUID() }]); e.currentTarget.reset() }
+  const titles = { home: ['Drumul tău. În ritmul tău.', 'Mai puțin timp în trafic. Mai mult timp pentru tine.'], routes: ['Fiecare drum, la îndemână.', 'Regăsește traseele planificate și pornește când ești pregătit.'], rides: ['Drumurile sunt mai bune împreună.', 'Organizează curse și păstrează-le pe dispozitivul tău.'], schedule: ['Un pic de ordine. Mai mult timp.', 'Adaugă cursurile și planifică drumul spre facultate.'], settings: ['Fă-l să fie al tău.', 'Preferințele tale se păstrează în acest browser.'] }
+  return <div className={`app ${theme}`}>
+    <aside className="sidebar"><a className="brand" href="#" onClick={e => { e.preventDefault(); setPage('home') }}><span className="brand-icon">↗</span><span>F1VE<span className="brand-light"> DR1VE</span><small>YOUR EVERYDAY COPILOT</small></span></a><div className="workspace-label">SPAȚIUL TĂU</div><nav aria-label="Navigare principală">{navigation.map(([id, icon, label]) => <button key={id} className={page === id ? 'nav-item active' : 'nav-item'} onClick={() => { setPage(id); setNotice('') }}><span>{icon}</span><span>{label}</span>{page === id && <i />}</button>)}</nav><div className="sidebar-bottom"><div className="community-card"><span>ÎMPREUNĂ, MAI DEPARTE</span><h3>Același drum.<br />O companie bună.</h3><p>Organizează o cursă cu colegii tăi.</p><button onClick={() => setPage('rides')}>Vezi cursele <span>↗</span></button></div><div className="profile"><span className="avatar">{(name || 'T')[0].toUpperCase()}</span><div><strong>{name || 'Călător'}</strong><small>Profil local</small></div><button aria-label="Setările profilului" onClick={() => setPage('settings')}>⚙</button></div></div></aside>
+    <div className="main-shell"><header className="topbar"><span className="breadcrumb">Spațiul tău <span>/</span> <strong>{navigation.find(n => n[0] === page)[2]}</strong></span><div className="top-actions"><span className="local-badge"><i /> MOD LOCAL</span><button className="icon-button" aria-label="Schimbă tema" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}>{theme === 'dark' ? '☀' : '☾'}</button><span className="avatar small">{(name || 'T')[0].toUpperCase()}</span></div></header>
+    <main><div className="page-heading"><div><div className="eyebrow">BINE AI VENIT{name ? `, ${name.toUpperCase()}` : ' LA F1VE DR1VE'} <span>✦</span></div><h1>{titles[page][0]}</h1><p>{titles[page][1]}</p></div><span className="date-chip">{new Date().toLocaleDateString('ro-RO', { day: 'numeric', month: 'long', year: 'numeric' })}</span></div>
+    {notice && <div className="notice" role="status">{notice}<button aria-label="Închide mesajul" onClick={() => setNotice('')}>×</button></div>}
+    {page === 'home' && <><div className="dashboard-grid"><section className="panel planner"><div className="section-title"><span className="section-icon">↗</span><div><h2>Unde mergem astăzi?</h2><p>Planifică următorul tău drum.</p></div></div><form onSubmit={plan}><div className="route-inputs"><label><span>PLECARE</span><div className="input-wrap"><i className="point origin" /><input required value={from} onChange={e => setFrom(e.target.value)} placeholder="Adresă, zonă sau localitate" aria-label="Plecare"/><button type="button" className="locate" title="Folosește locația mea" aria-label="Folosește locația mea" onClick={locate}>⌖</button></div></label><button type="button" className="swap" aria-label="Inversează plecarea și destinația" onClick={() => { setFrom(to); setTo(from) }}>⇅</button><label><span>DESTINAȚIE</span><div className="input-wrap"><i className="point destination" /><input required value={to} onChange={e => setTo(e.target.value)} placeholder="Unde vrei să ajungi?" aria-label="Destinație" /></div></label></div><div className="time-row"><label><span>ORA PLECĂRII</span><input type="time" required value={time} onChange={e => setTime(e.target.value)} /></label><span className="transport">▰ <span>Cu mașina</span></span></div><button className="primary full" type="submit">Planifică traseul <span>↗</span></button></form><div className="quick-places"><span>DESTINAȚII RAPIDE</span><div>{['Palas Iași', 'Universitatea Alexandru Ioan Cuza, Iași', 'Universitatea Tehnică Gheorghe Asachi, Iași'].map((place, i) => <button key={place} onClick={() => { setTo(place); setMap(place) }}>{['⌂ Palas', '▦ UAIC', '▦ TUIASI'][i]}</button>)}</div></div><div className="planner-note"><span>◈</span><p>Un drum bine planificat începe cu un pic de liniște.</p></div></section>
+    <section className="map-panel" aria-label="Hartă interactivă"><iframe title="Harta destinației" src={mapUrl(map)} loading="lazy" referrerPolicy="no-referrer-when-downgrade" allowFullScreen /><div className="map-label"><i /> EXPLOREAZĂ ORAȘUL <span>Iași & oriunde te duce drumul</span></div><div className="map-bottom"><div><span className="map-pin">⌖</span><div><strong>{selected ? selected.to : 'Următoarea oprire? Tu alegi.'}</strong><small>{selected ? `Plecare la ${selected.time} · trafic disponibil în Google Maps` : 'Alege o destinație și pregătește-te de drum.'}</small></div></div>{selected && <a className="primary" href={directions(selected.from, selected.to)} target="_blank" rel="noreferrer">Navighează ↗</a>}</div></section></div>
+    <div className="bottom-grid"><section className="panel recent"><div className="card-heading"><h2>Trasee recente</h2><button className="text-button" onClick={() => setPage('routes')}>Vezi toate ↗</button></div>{history.length ? history.slice(0, 2).map(route => <RouteRow key={route.id} route={route} />) : <div className="empty-inline"><span>↗</span><div><h3>Primul drum începe aici.</h3><p>Traseele planificate vor apărea în această listă.</p></div></div>}</section><section className="ride-banner"><div className="eyebrow">MAI MULT DECÂT UN DRUM</div><h2>Împarte drumul.<br /><span>Adună amintiri.</span></h2><p>Ai un loc liber? Planifică o cursă cu colegii.</p><button onClick={() => { setPage('rides'); setModal(true) }}>Organizează o cursă <span>↗</span></button><div className="banner-art" aria-hidden="true">↗</div></section></div><div className="footer-note"><span>✦ Fă loc lucrurilor care contează.</span><span>F1VE DR1VE · Drumuri cu sens.</span></div></>}
+    {page === 'routes' && <section className="panel content-panel"><div className="card-heading"><h2>Istoricul traseelor <span className="count">{history.length}</span></h2></div>{history.length ? history.map(route => <RouteRow key={route.id} route={route} onDelete={() => setHistory(history.filter(r => r.id !== route.id))}/>) : <Empty text="Nu ai planificat încă un traseu." action="Planifică primul drum" onClick={() => setPage('home')} />}</section>}
+    {page === 'rides' && <section className="panel content-panel"><div className="card-heading"><h2>Cursele tale</h2><button className="primary" onClick={() => setModal(true)}>+ Adaugă o cursă</button></div><p className="helper">Cursele sunt salvate doar în acest browser. Conectarea cu alți utilizatori necesită un server și nu este activă în această versiune.</p><input className="search" placeholder="Caută după destinație sau plecare…" aria-label="Caută curse" value={filter} onChange={e => setFilter(e.target.value)}/>{rides.filter(r => `${r.from} ${r.to}`.toLocaleLowerCase('ro').includes(filter.toLocaleLowerCase('ro'))).map(ride => <div className="ride-row" key={ride.id}><span className="route-symbol">♧</span><div><h3>{ride.from} → {ride.to}</h3><p>{ride.date} · {ride.time} · {ride.seats} {ride.seats === 1 ? 'loc' : 'locuri'} · {ride.driver}</p></div><button className="text-button danger" onClick={() => setRides(rides.filter(r => r.id !== ride.id))}>Șterge</button></div>)}{!rides.length && <Empty text="Ai un loc liber sau un drum în plan?" action="Adaugă prima cursă" onClick={() => setModal(true)} />}{rides.length > 0 && !rides.some(r => `${r.from} ${r.to}`.toLocaleLowerCase('ro').includes(filter.toLocaleLowerCase('ro'))) && <p className="helper">Nicio cursă nu corespunde căutării.</p>}</section>}
+    {page === 'schedule' && <div className="schedule-grid"><section className="panel content-panel"><h2>Adaugă un curs</h2><form className="stack-form" onSubmit={addClass}><label>Denumirea cursului<input name="title" required placeholder="Ex. Programare web" maxLength={100}/></label><label>Locația<input name="location" required placeholder="Facultate, corp, adresă" maxLength={200}/></label><div className="form-columns"><label>Ziua<select name="day">{['Luni','Marți','Miercuri','Joi','Vineri','Sâmbătă','Duminică'].map(day => <option key={day}>{day}</option>)}</select></label><label>Ora<input name="time" type="time" required /></label></div><button className="primary">Salvează cursul +</button></form></section><section className="panel content-panel"><h2>Programul tău</h2>{classes.length ? classes.map(item => <div className="class-row" key={item.id}><span className="class-time">{item.time}<small>{item.day}</small></span><div><h3>{item.title}</h3><p>{item.location}</p><button className="text-button" onClick={() => { setTo(item.location); setPage('home') }}>Planifică drumul ↗</button></div><button className="icon-button" aria-label={`Șterge ${item.title}`} onClick={() => setClasses(classes.filter(c => c.id !== item.id))}>×</button></div>) : <p className="helper">Adaugă primul curs pentru a-ți organiza săptămâna.</p>}</section></div>}
+    {page === 'settings' && <section className="panel content-panel settings-panel"><h2>Profil și aspect</h2><label className="settings-label">Cum te numești?<input value={name} maxLength={50} onChange={e => setName(e.target.value)} placeholder="Numele tău" /></label><div className="setting-row"><div><h3>Temă luminoasă</h3><p>Alege aspectul care îți place.</p></div><button className={`toggle ${theme === 'light' ? 'on' : ''}`} role="switch" aria-checked={theme === 'light'} aria-label="Temă luminoasă" onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}><span /></button></div><div className="setting-row"><div><h3>Datele tale rămân aici</h3><p>Istoricul, orarul și cursele sunt păstrate în browser. Nu sunt sincronizate cu aplicația Python sau cu alte dispozitive.</p></div><span>◈</span></div></section>}
+    </main></div>
+    {modal && <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setModal(false) }}><dialog open aria-labelledby="ride-title"><div className="card-heading"><h2 id="ride-title">Organizează o cursă</h2><button className="icon-button" autoFocus aria-label="Închide" onClick={() => setModal(false)}>×</button></div><form className="stack-form" onSubmit={publish}><label>Numele tău<input name="driver" required defaultValue={name} maxLength={60}/></label><label>Plecare<input name="from" required maxLength={200}/></label><label>Destinație<input name="to" required maxLength={200}/></label><div className="form-columns"><label>Data<input type="date" name="date" required min={new Date().toLocaleDateString('en-CA')} /></label><label>Ora<input type="time" name="time" required /></label></div><label>Locuri disponibile<input type="number" name="seats" defaultValue="1" min="1" max="8" required /></label><p className="helper">Alege un punct public de întâlnire. Cursa va fi vizibilă doar în acest browser.</p><button className="primary full">Salvează cursa ↗</button></form></dialog></div>}
+  </div>
+}
+function RouteRow({ route, onDelete }) { return <div className="route-row"><span className="route-symbol">↗</span><div><h3>{route.from} <span>→</span> {route.to}</h3><p>{route.date} <span>·</span> Plecare la {route.time}</p></div><a className="icon-button" href={directions(route.from, route.to)} target="_blank" rel="noreferrer" aria-label={`Navighează spre ${route.to}`}>↗</a>{onDelete && <button className="icon-button" onClick={onDelete} aria-label="Șterge traseul">×</button>}</div> }
+function Empty({ text, action, onClick }) { return <div className="empty"><span>↗</span><h3>{text}</h3><button className="primary" onClick={onClick}>{action}</button></div> }
